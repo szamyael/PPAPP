@@ -2,7 +2,19 @@
 -- Migration: Storage Buckets + Policies
 -- ============================================================
 
--- Create buckets (idempotent)
+-- Safely ensure schema exists in case of manual dashboard changes on standard tables
+alter table public.profiles 
+  add column if not exists role text not null default 'student' check (role in ('admin', 'student', 'tutor', 'organization')),
+  add column if not exists approval_status text not null default 'pending' check (approval_status in ('pending', 'approved', 'rejected')),
+  add column if not exists organization_id uuid references public.organizations(id) on delete set null,
+  add column if not exists avatar_url text,
+  add column if not exists student_id text,
+  add column if not exists program text,
+  add column if not exists year_level text,
+  add column if not exists department text;
+
+alter table public.tutor_profiles 
+  add column if not exists organization_id uuid references public.organizations(id) on delete set null;
 insert into storage.buckets (id, name, public, file_size_limit, allowed_mime_types)
 values
   ('avatars',     'avatars',     true,  2097152,   array['image/png','image/jpeg','image/webp','image/gif']),
@@ -69,10 +81,10 @@ create policy "credentials_org_read" on storage.objects
     and exists (
       select 1
       from public.tutor_profiles tp
-      join public.profiles caller on caller.id = auth.uid()
+      join public.profiles p on p.id = auth.uid()
       where tp.user_id::text = (storage.foldername(name))[1]
-        and tp.organization_id = caller.organization_id
-        and caller.role = 'organization'
+        and tp.organization_id = p.organization_id
+        and p.role = 'organization'
     )
   );
 
