@@ -116,7 +116,7 @@ export function RegisterWizard() {
 
   // ── Derived values ───────────────────────────────────────────────────────────
   const fullName = [firstName, middleName, lastName, suffix].filter(Boolean).join(" ");
-  const totalSteps = accountType === "organization" ? 3
+  const totalSteps = accountType === "organization" ? 2
                    : accountType === "tutor"        ? 4
                    : 4; // student
 
@@ -339,7 +339,12 @@ export function RegisterWizard() {
 
     const handleNext2 = () => {
       if (!canContinue) { toast.error("Please fill in all required fields."); return; }
-      next();
+      if (accountType === "organization") {
+        // submit directly
+        void handleSubmit();
+      } else {
+        next();
+      }
     };
 
     return (
@@ -416,9 +421,13 @@ export function RegisterWizard() {
               <Button variant="outline" onClick={back} className="flex-1">
                 <ChevronLeft className="h-4 w-4 mr-1" /> Back
               </Button>
-              <Button onClick={handleNext2} className="flex-1" disabled={!canContinue}>
-                {accountType === "organization" ? "Submit Request" : "Continue"}
-                <ChevronRight className="h-4 w-4 ml-1" />
+              <Button onClick={handleNext2} className="flex-1" disabled={!canContinue || loading}>
+                {loading
+                  ? <><Loader2 className="h-4 w-4 mr-2 animate-spin" /> Submitting…</>
+                  : accountType === "organization"
+                  ? <>Submit Request <ChevronRight className="h-4 w-4 ml-1" /></>
+                  : <>Continue <ChevronRight className="h-4 w-4 ml-1" /></>
+                }
               </Button>
             </div>
           </CardContent>
@@ -577,10 +586,7 @@ export function RegisterWizard() {
     );
   }
 
-  // ─────────────────────────────────────────────────────────────────────────────
-  // STEP 3 (org) / STEP 4 (student/tutor) — Account Security
-  // Org goes step2 → submit, so this only renders for student/tutor
-  // ─────────────────────────────────────────────────────────────────────────────
+  // Org submits directly from Step 2 above — no Step 3 for org.
   if (step === 4 && accountType !== "organization") {
     const canSubmit = email.trim() !== "" && password.length >= 8 && password === confirmPassword;
 
