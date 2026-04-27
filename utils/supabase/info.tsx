@@ -4,23 +4,14 @@
 // If a var is missing we throw at startup to surface misconfiguration immediately
 // rather than failing silently at runtime with cryptic network errors.
 
-function getEnvVar(key: string): string {
-  const value = (import.meta as any)?.env?.[key];
-  if (!value) {
-    throw new Error(
-      `[Piyupair] Missing environment variable: ${key}. ` +
-      `Copy .env.example to .env and fill in all VITE_SUPABASE_* values.`
-    );
-  }
-  return value as string;
+export const projectId = import.meta.env.VITE_SUPABASE_PROJECT_ID;
+export const supabaseUrl = import.meta.env.VITE_SUPABASE_URL;
+export const supabaseFunctionsBaseUrl = import.meta.env.VITE_SUPABASE_FUNCTIONS_BASE_URL;
+export const publicAnonKey = import.meta.env.VITE_SUPABASE_ANON_KEY;
+
+if (!projectId || !supabaseUrl || !publicAnonKey) {
+  throw new Error(
+    `[Piyupair] Missing environment variables. ` +
+    `Ensure VITE_SUPABASE_PROJECT_ID, VITE_SUPABASE_URL, VITE_SUPABASE_FUNCTIONS_BASE_URL, and VITE_SUPABASE_ANON_KEY are set.`
+  );
 }
-
-export const projectId = getEnvVar("VITE_SUPABASE_PROJECT_ID");
-
-export const supabaseUrl = getEnvVar("VITE_SUPABASE_URL");
-
-export const supabaseFunctionsBaseUrl = getEnvVar("VITE_SUPABASE_FUNCTIONS_BASE_URL");
-
-// The anon (public) key is intentionally shipped to the browser.
-// It gates access behind Row Level Security; it is NOT a secret.
-export const publicAnonKey = getEnvVar("VITE_SUPABASE_ANON_KEY");
