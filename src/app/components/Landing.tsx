@@ -33,7 +33,7 @@ export function Landing() {
                   <Button variant="outline" onClick={() => navigate("/login")}>
                     Login
                   </Button>
-                  <Button onClick={() => navigate("/register/student")}>
+                  <Button onClick={() => navigate("/register")}>
                     Get Started
                   </Button>
                 </>
@@ -171,17 +171,9 @@ export function Landing() {
             <Button
               size="lg"
               className="bg-white text-purple-600 hover:bg-gray-100"
-              onClick={() => navigate("/register/student")}
+              onClick={() => navigate("/register")}
             >
-              Sign Up as Student
-            </Button>
-            <Button
-              size="lg"
-              variant="outline"
-              className="border-white text-white hover:bg-white/10"
-              onClick={() => navigate("/register/tutor")}
-            >
-              Apply as Tutor
+              Get Started
             </Button>
           </div>
         </div>

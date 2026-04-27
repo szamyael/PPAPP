@@ -31,7 +31,12 @@ interface AuthContextType {
 interface RegisterPayload {
   email: string;
   password: string;
-  name: string;
+  name: string;          // full name (composed by the wizard)
+  // Split name fields (from RegisterWizard)
+  firstName?: string;
+  middleName?: string;
+  lastName?: string;
+  suffix?: string;
   role: UserRole | "organization_request";
   // Student fields
   studentId?: string;
@@ -261,11 +266,16 @@ export const AuthProvider: React.FC<{ children: React.ReactNode }> = ({
     // ── Extend profile with role-specific fields ──
     const profileUpdate: Record<string, unknown> = {};
 
-    if (userData.studentId) profileUpdate.student_id = userData.studentId;
-    if (userData.program)   profileUpdate.program     = userData.program;
-    if (userData.yearLevel) profileUpdate.year_level  = userData.yearLevel;
-    if (userData.department) profileUpdate.department = userData.department;
-    if (orgId)              profileUpdate.organization_id = orgId;
+    if (userData.studentId)   profileUpdate.student_id = userData.studentId;
+    if (userData.program)      profileUpdate.program     = userData.program;
+    if (userData.yearLevel)    profileUpdate.year_level  = userData.yearLevel;
+    if (userData.department)   profileUpdate.department  = userData.department;
+    if (orgId)                 profileUpdate.organization_id = orgId;
+    // Split name fields
+    if (userData.firstName)    profileUpdate.first_name  = userData.firstName;
+    if (userData.middleName)   profileUpdate.middle_name = userData.middleName;
+    if (userData.lastName)     profileUpdate.last_name   = userData.lastName;
+    if (userData.suffix)       profileUpdate.suffix      = userData.suffix;
 
     if (Object.keys(profileUpdate).length > 0) {
       // Upsert in case trigger hasn't fired yet

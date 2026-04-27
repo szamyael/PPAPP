@@ -2,9 +2,7 @@ import { createBrowserRouter } from "react-router";
 import { Root } from "./components/Root";
 import { Landing } from "./components/Landing";
 import { Login } from "./components/Login";
-import { RegisterStudent } from "./components/RegisterStudent";
-import { RegisterTutor } from "./components/RegisterTutor";
-import { RegisterOrganization } from "./components/RegisterOrganization";
+import { RegisterWizard } from "./components/RegisterWizard";
 import { StudentDashboard } from "./components/StudentDashboard";
 import { TutorDashboard } from "./components/TutorDashboard";
 import { OrganizationDashboard } from "./components/OrganizationDashboard";
@@ -34,9 +32,7 @@ export const router = createBrowserRouter([
     children: [
       { index: true, Component: Landing },
       { path: "login", Component: Login },
-      { path: "register/student", Component: RegisterStudent },
-      { path: "register/tutor", Component: RegisterTutor },
-      { path: "register/organization", Component: RegisterOrganization },
+      { path: "register", Component: RegisterWizard },
       { path: "dashboard/student", Component: StudentDashboard },
       { path: "dashboard/tutor", Component: TutorDashboard },
       { path: "dashboard/organization", Component: OrganizationDashboard },
