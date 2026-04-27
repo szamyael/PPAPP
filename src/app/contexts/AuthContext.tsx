@@ -26,6 +26,7 @@ interface AuthContextType {
   login: (email: string, password: string) => Promise<boolean>;
   logout: () => void;
   register: (userData: RegisterPayload) => Promise<boolean>;
+  verifyOtp: (email: string, token: string) => Promise<boolean>;
 }
 
 interface RegisterPayload {
@@ -306,6 +307,22 @@ export const AuthProvider: React.FC<{ children: React.ReactNode }> = ({
     // Sign out immediately — account must be approved before first login
     await supabase.auth.signOut();
 
+    return true;
+  };
+
+  // ── Verify OTP ────────────────────────────────────────────────────
+  const verifyOtp = async (email: string, token: string): Promise<boolean> => {
+    setLoginError(null);
+    const { error } = await supabase.auth.verifyOtp({
+      email,
+      token,
+      type: "signup",
+    });
+
+    if (error) {
+      setLoginError(error.message);
+      return false;
+    }
     return true;
   };
 

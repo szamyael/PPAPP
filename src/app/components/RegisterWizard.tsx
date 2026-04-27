@@ -77,7 +77,7 @@ type AccountType = "student" | "tutor" | "organization" | "";
 // ─── Component ────────────────────────────────────────────────────────────────
 export function RegisterWizard() {
   const navigate = useNavigate();
-  const { register, loginError } = useAuth();
+  const { register, verifyOtp, loginError } = useAuth();
   const fileInputRef = useRef<HTMLInputElement>(null);
 
   const [step, setStep]               = useState(1);
@@ -130,65 +130,12 @@ export function RegisterWizard() {
   };
 
   const handleSendCode = async () => {
-    if (!email) {
-      toast.error("Please enter your email address first.");
-      return;
-    }
+    if (!email) { toast.error("Please enter your email address first."); return; }
+    if (!password || password.length < 8) { toast.error("Please set a password of at least 8 characters first."); return; }
+    
     setSendingCode(true);
 
-    try {
-      // For real projects, this requires Supabase SMTP tracking,
-      // but 'signInWithOtp' fails on non-existent users if shouldCreateUser is false.
-      // So we will simulate a successful send for the registration flow UI 
-      // without triggering a Supabase internal 400 error.
-      await new Promise(resolve => setTimeout(resolve, 1500));
-      
-      setCodeSent(true);
-      toast.success("Verification code sent! (Mocked for testing, enter any 6 digits)");
-    } catch (error: any) {
-      toast.error(`Failed to send code: ${error.message}`);
-    } finally {
-      setSendingCode(false);
-    }
-  };
-
-  // ── Final submit ─────────────────────────────────────────────────────────────
-  const handleSubmit = async () => {
-    if (password !== confirmPassword) { toast.error("Passwords do not match."); return; }
-    if (codeSent && !verificationCode) { toast.error("Please enter the verification code."); return; }
-
-    setLoading(true);
-
-    if (accountType === "organization") {
-      const success = await register({
-        name:     orgName,
-        orgName,
-        email,
-        password: "placeholder",
-        message:  orgMessage,
-        role:     "organization_request" as any,
-      });
-      setLoading(false);
-      if (success) { setSubmitted(true); }
-      else { toast.error(loginError ?? "Submission failed. Please try again."); }
-      return;
-    }
-
-    if (accountType === "tutor") {
-      // Validate org code
-      const { data: org, error: orgError } = await supabase
-        .from("organizations")
-        .select("id")
-        .eq("unique_code", orgCode.toUpperCase().trim())
-        .maybeSingle();
-
-      if (orgError || !org) {
-        toast.error("Invalid organization code. Contact your organization for the correct code.");
-        setLoading(false);
-        return;
-      }
-    }
-
+    // Call register to trigger Supabase signUp (which sends the confirmation email)
     const success = await register({
       name:             fullName,
       firstName,
@@ -208,33 +155,80 @@ export function RegisterWizard() {
       experience:       accountType === "tutor"   ? experience     : undefined,
     });
 
-    // Upload tutor credentials after successful auth
-    if (success && accountType === "tutor" && credentials.length > 0) {
-      const { data: profile } = await supabase
-        .from("profiles").select("id").eq("email", email).maybeSingle();
-      if (profile?.id) {
-        const urls: string[] = [];
-        for (const file of credentials) {
-          const { path } = await uploadCredential(file, profile.id);
-          urls.push(path);
-        }
-        await supabase
-          .from("tutor_profiles")
-          .update({ credentials_urls: urls })
-          .eq("user_id", profile.id);
-      }
-    }
-
-    setLoading(false);
+    setSendingCode(false);
 
     if (success) {
+      setCodeSent(true);
+      toast.success("Verification code sent! Please check your email.");
+    } else {
+      toast.error(loginError ?? "Failed to send code. Please try again.");
+    }
+  };
+
+  // ── Final submit ─────────────────────────────────────────────────────────────
+  const handleSubmit = async () => {
+    if (accountType !== "organization" && !codeSent) {
+      toast.error("Please click 'Send Code' and verify your email first.");
+      return;
+    }
+
+    setLoading(true);
+
+    if (accountType === "organization") {
+      const success = await register({
+        name:     orgName,
+        orgName,
+        email,
+        password: Math.random().toString(36).slice(-12), // Orgs don't have logins yet
+        message:  orgMessage,
+        role:     "organization_request" as any,
+      });
+      setLoading(false);
+      if (success) { setSubmitted(true); }
+      else { toast.error(loginError ?? "Submission failed. Please try again."); }
+      return;
+    }
+
+    // Verify the OTP code
+    // (Actual logic is in handleVerifyAndComplete)
+  };
+
+  const handleVerifyAndComplete = async () => {
+    if (!verificationCode) {
+      toast.error("Please enter the verification code from your email.");
+      return;
+    }
+
+    setLoading(true);
+    const success = await verifyOtp(email, verificationCode);
+    
+    if (success) {
+      // Handle tutor credentials upload if needed
+      if (accountType === "tutor" && credentials.length > 0) {
+        const { data: profile } = await supabase
+          .from("profiles").select("id").eq("email", email).maybeSingle();
+        if (profile?.id) {
+          const urls: string[] = [];
+          for (const file of credentials) {
+            const { path } = await uploadCredential(file, profile.id);
+            urls.push(path);
+          }
+          await supabase
+            .from("tutor_profiles")
+            .update({ credentials_urls: urls })
+            .eq("user_id", profile.id);
+        }
+      }
+
+      setLoading(false);
       const msg = accountType === "student"
-        ? "Registration submitted! Your account is pending admin approval."
-        : "Application submitted! Your organization will review your credentials.";
+        ? "Registration successful! Your account is pending admin approval."
+        : "Application successful! Your organization will review your credentials.";
       toast.success(msg);
       navigate("/login");
     } else {
-      toast.error(loginError ?? "Registration failed. Please try again.");
+      setLoading(false);
+      toast.error(loginError ?? "Invalid verification code.");
     }
   };
 
@@ -698,7 +692,7 @@ export function RegisterWizard() {
                 <ChevronLeft className="h-4 w-4 mr-1" /> Back
               </Button>
               <Button
-                onClick={handleSubmit}
+                onClick={handleVerifyAndComplete}
                 className="flex-1"
                 disabled={loading || !canSubmit}
               >
