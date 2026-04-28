@@ -24,6 +24,22 @@ type ChatMessage = {
   createdAt: number;
 };
 
+// Common questions that don't need API calls (cached responses)
+const QUICK_ANSWERS: Record<string, string> = {
+  "how do i book a session": "Go to 'Find Tutors', select a tutor, and choose a date/time that works for you. Click 'Book Session' to confirm.",
+  "how do i join a video call": "When a session starts, you'll see a 'Join Video Call' button on the session card. Click it to connect.",
+  "how do i rate a tutor": "After a session completes, go to 'My Sessions', find the past session, and click 'Rate Session'.",
+  "what's my organization code": "Check your organization dashboard for your unique organization code to share with tutors.",
+  "why can't i login": "Try clearing your browser cache, disabling extensions, or using an incognito window. If issues persist, file a ticket.",
+  "how do i reset my password": "Use the 'Forgot Password' link on the login page. If you don't receive an email, file a support ticket.",
+  "how do i upload materials": "Tutors can upload materials via the 'Learning Materials' section on their dashboard.",
+  "how do i find a tutor": "Go to your Dashboard, click 'Find a Tutor', and use filters to search by subject, rating, or availability.",
+  "what's the newsfeed": "The newsfeed is a community board where you can share questions, announcements, events, and learning materials.",
+  "can i cancel a session": "Yes, you can cancel pending sessions from 'My Sessions'. Contact the other party if needed.",
+  "app is loading slowly": "Try refreshing the page, clearing your cache, or checking your internet connection.",
+  "can't see real-time updates": "Refresh the page to sync data. If issues continue, check your internet connection.",
+};
+
 const endpointBase = supabaseFunctionsBaseUrl;
 
 function useStableId() {
@@ -32,14 +48,15 @@ function useStableId() {
 
 export function FloatingSupportWidget() {
   const [open, setOpen] = useState(false);
-  const [activeTab, setActiveTab] = useState<"chat" | "ticket">("chat");
+  const [activeTab, setActiveTab] = useState<"chat" | "tutorial" | "info" | "ticket">("chat");
+  const [apiCallCount, setApiCallCount] = useState(0);
 
   const initialId = useStableId();
   const [messages, setMessages] = useState<ChatMessage[]>(() => [
     {
       id: initialId,
       role: "bot",
-      content: "Hi! Ask a question here, or file a ticket for the developers.",
+      content: "Hi! 👋 Ask a question, check tutorials, system info, or file a ticket. I can answer ~5 questions per session to save resources.",
       createdAt: Date.now(),
     },
   ]);
@@ -71,6 +88,17 @@ export function FloatingSupportWidget() {
     [],
   );
 
+  // Check if a question matches a cached quick answer
+  const getQuickAnswer = (input: string): string | null => {
+    const normalized = input.toLowerCase().trim();
+    for (const [key, value] of Object.entries(QUICK_ANSWERS)) {
+      if (normalized.includes(key) || key.includes(normalized.split(" ")[0])) {
+        return value;
+      }
+    }
+    return null;
+  };
+
   const sendChat = async () => {
     const trimmed = chatInput.trim();
     if (!trimmed || chatLoading) return;
@@ -87,6 +115,36 @@ export function FloatingSupportWidget() {
     setChatLoading(true);
 
     try {
+      // Check API call limit
+      if (apiCallCount >= 5) {
+        setMessages((prev) => [
+          ...prev,
+          {
+            id: crypto.randomUUID(),
+            role: "bot",
+            content: "You’ve reached your chat limit for this session. For more help, please file a ticket with details of your issue.",
+            createdAt: Date.now(),
+          },
+        ]);
+        setChatLoading(false);
+        return;
+      }
+
+      // Check for quick answer first (no API call)
+      const quickAnswer = getQuickAnswer(trimmed);
+      if (quickAnswer) {
+        const botMsg: ChatMessage = {
+          id: crypto.randomUUID(),
+          role: "bot",
+          content: quickAnswer,
+          createdAt: Date.now(),
+        };
+        setMessages((prev) => [...prev, botMsg]);
+        setChatLoading(false);
+        return;
+      }
+
+      // Use API for custom questions
       const response = await fetch(`${endpointBase}/support/chat`, {
         method: "POST",
         headers,
@@ -96,6 +154,8 @@ export function FloatingSupportWidget() {
       const data = (await response.json()) as { reply?: string; error?: string };
       if (!response.ok) throw new Error(data?.error || "Chat request failed");
 
+      setApiCallCount((prev) => prev + 1);
+
       const botMsg: ChatMessage = {
         id: crypto.randomUUID(),
         role: "bot",
@@ -104,6 +164,19 @@ export function FloatingSupportWidget() {
       };
 
       setMessages((prev) => [...prev, botMsg]);
+
+      // Warn if approaching limit
+      if (apiCallCount + 1 >= 4) {
+        setMessages((prev) => [
+          ...prev,
+          {
+            id: crypto.randomUUID(),
+            role: "bot",
+            content: `⚠️ You have ${5 - (apiCallCount + 1)} question(s) left. For complex issues, please file a ticket.`,
+            createdAt: Date.now(),
+          },
+        ]);
+      }
     } catch (err) {
       const message = err instanceof Error ? err.message : "Chat request failed";
       toast.error(message);
@@ -112,7 +185,7 @@ export function FloatingSupportWidget() {
         {
           id: crypto.randomUUID(),
           role: "bot",
-          content: "Sorry — I couldn’t reach support services. Try again or file a ticket.",
+          content: "Sorry — I couldn’t reach support services. Try filing a ticket instead, and we’ll help you out.",
           createdAt: Date.now(),
         },
       ]);
