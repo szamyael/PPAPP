@@ -36,12 +36,7 @@ export function Newsfeed() {
   const { data: following, isLoading: followingLoading } = useUserConnections(user?.id);
 
   // Set up real-time subscription
-  useEffect(() => {
-    const subscription = useNewsfeedSubscription();
-    return () => {
-      supabase.removeChannel(subscription);
-    };
-  }, []);
+  useNewsfeedSubscription();
 
   const isLoading = postsLoading || followingLoading;
 

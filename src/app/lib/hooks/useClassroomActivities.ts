@@ -1,4 +1,5 @@
 import { useQuery, useQueryClient } from "@tanstack/react-query";
+import { useEffect } from "react";
 import { supabase } from "../supabaseClient";
 
 export interface ClassroomActivity {
@@ -90,17 +91,21 @@ export function useClassroomSubmissions(classroomId: string | undefined) {
 export function useClassroomSubscription(classroomId: string | undefined) {
   const queryClient = useQueryClient();
 
-  return supabase
-    .channel(`classroom-${classroomId}`)
-    .on("postgres_changes", { event: "INSERT", schema: "public", table: "classroom_activities" }, () => {
-      if (classroomId) {
+  useEffect(() => {
+    if (!classroomId) return;
+
+    const channel = supabase
+      .channel(`classroom-${classroomId}`)
+      .on("postgres_changes", { event: "INSERT", schema: "public", table: "classroom_activities" }, () => {
         queryClient.invalidateQueries({ queryKey: ["classroomActivities", classroomId] });
-      }
-    })
-    .on("postgres_changes", { event: "INSERT", schema: "public", table: "classroom_submissions" }, () => {
-      if (classroomId) {
+      })
+      .on("postgres_changes", { event: "INSERT", schema: "public", table: "classroom_submissions" }, () => {
         queryClient.invalidateQueries({ queryKey: ["classroomSubmissions", classroomId] });
-      }
-    })
-    .subscribe();
+      })
+      .subscribe();
+
+    return () => {
+      void supabase.removeChannel(channel);
+    };
+  }, [classroomId, queryClient]);
 }

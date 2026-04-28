@@ -1,4 +1,5 @@
 import { useQuery, useQueryClient } from "@tanstack/react-query";
+import { useEffect } from "react";
 import { supabase } from "../supabaseClient";
 
 export interface NewsfeedPost {
@@ -70,24 +71,30 @@ export function useNewsfeedPosts() {
 export function useNewsfeedSubscription() {
   const queryClient = useQueryClient();
 
-  return supabase
-    .channel("newsfeed-posts")
-    .on("postgres_changes", { event: "INSERT", schema: "public", table: "newsfeed_posts" }, (payload) => {
-      const newPost = mapDbPost(payload.new as DbNewsfeedPost);
-      queryClient.setQueryData(["newsfeedPosts"], (old: NewsfeedPost[] | undefined) => {
-        if (!old) return [newPost];
-        if (old.some((p) => p.id === newPost.id)) return old;
-        return [newPost, ...old];
-      });
-    })
-    .on("postgres_changes", { event: "UPDATE", schema: "public", table: "newsfeed_posts" }, (payload) => {
-      const updatedPost = mapDbPost(payload.new as DbNewsfeedPost);
-      queryClient.setQueryData(["newsfeedPosts"], (old: NewsfeedPost[] | undefined) => {
-        if (!old) return old;
-        return old.map((p) => (p.id === updatedPost.id ? updatedPost : p));
-      });
-    })
-    .subscribe();
+  useEffect(() => {
+    const channel = supabase
+      .channel("newsfeed-posts")
+      .on("postgres_changes", { event: "INSERT", schema: "public", table: "newsfeed_posts" }, (payload) => {
+        const newPost = mapDbPost(payload.new as DbNewsfeedPost);
+        queryClient.setQueryData(["newsfeedPosts"], (old: NewsfeedPost[] | undefined) => {
+          if (!old) return [newPost];
+          if (old.some((p) => p.id === newPost.id)) return old;
+          return [newPost, ...old];
+        });
+      })
+      .on("postgres_changes", { event: "UPDATE", schema: "public", table: "newsfeed_posts" }, (payload) => {
+        const updatedPost = mapDbPost(payload.new as DbNewsfeedPost);
+        queryClient.setQueryData(["newsfeedPosts"], (old: NewsfeedPost[] | undefined) => {
+          if (!old) return old;
+          return old.map((p) => (p.id === updatedPost.id ? updatedPost : p));
+        });
+      })
+      .subscribe();
+
+    return () => {
+      void supabase.removeChannel(channel);
+    };
+  }, [queryClient]);
 }
 
 export function useUserConnections(userId: string | undefined) {

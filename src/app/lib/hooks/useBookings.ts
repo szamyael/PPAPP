@@ -1,4 +1,5 @@
 import { useQuery, useQueryClient } from "@tanstack/react-query";
+import { useEffect } from "react";
 import { supabase } from "../supabaseClient";
 
 export interface Booking {
@@ -196,19 +197,25 @@ export function useUpcomingSessions(userId: string | undefined) {
 export function useBookingsSubscription(userId: string | undefined) {
   const queryClient = useQueryClient();
 
-  return supabase
-    .channel(`bookings-${userId}`)
-    .on(
-      "postgres_changes",
-      { event: "*", schema: "public", table: "bookings" },
-      () => {
-        // Invalidate all bookings queries for this user
-        if (userId) {
+  useEffect(() => {
+    if (!userId) return;
+
+    const channel = supabase
+      .channel(`bookings-${userId}`)
+      .on(
+        "postgres_changes",
+        { event: "*", schema: "public", table: "bookings" },
+        () => {
+          // Invalidate all bookings queries for this user
           queryClient.invalidateQueries({ queryKey: ["bookings", "student", userId] });
           queryClient.invalidateQueries({ queryKey: ["bookings", "tutor", userId] });
           queryClient.invalidateQueries({ queryKey: ["bookings", "upcoming", userId] });
         }
-      }
-    )
-    .subscribe();
+      )
+      .subscribe();
+
+    return () => {
+      void supabase.removeChannel(channel);
+    };
+  }, [userId, queryClient]);
 }

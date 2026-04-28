@@ -22,12 +22,7 @@ export function StudyGroups() {
   const { data: groups, isLoading, error } = useStudyGroups();
 
   // Set up real-time subscription for new groups
-  useEffect(() => {
-    const subscription = useStudyGroupsSubscription();
-    return () => {
-      supabase.removeChannel(subscription);
-    };
-  }, []);
+  useStudyGroupsSubscription();
 
   const filteredGroups = useMemo(() => {
     if (!groups) return [];

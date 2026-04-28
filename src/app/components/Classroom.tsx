@@ -42,12 +42,7 @@ export function Classroom() {
   const { data: submissionCounts, isLoading: submissionsLoading } = useClassroomSubmissions(classroomId);
 
   // Set up real-time subscription
-  useEffect(() => {
-    const subscription = useClassroomSubscription(classroomId);
-    return () => {
-      supabase.removeChannel(subscription);
-    };
-  }, [classroomId]);
+  useClassroomSubscription(classroomId);
 
   const [submissionNote, setSubmissionNote] = useState("");
   const [submissionFileName, setSubmissionFileName] = useState<string | null>(null);

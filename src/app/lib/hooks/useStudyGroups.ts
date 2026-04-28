@@ -1,4 +1,5 @@
 import { useQuery, useQueryClient } from "@tanstack/react-query";
+import { useEffect } from "react";
 import { supabase } from "../supabaseClient";
 
 export interface StudyGroup {
@@ -51,15 +52,21 @@ export function useStudyGroups() {
 export function useStudyGroupsSubscription() {
   const queryClient = useQueryClient();
 
-  return supabase
-    .channel("study-groups")
-    .on("postgres_changes", { event: "INSERT", schema: "public", table: "study_groups" }, (payload) => {
-      const newGroup = mapDbGroup(payload.new as DbStudyGroup);
-      queryClient.setQueryData(["studyGroups"], (old: StudyGroup[] | undefined) => {
-        if (!old) return [newGroup];
-        if (old.some((g) => g.id === newGroup.id)) return old;
-        return [newGroup, ...old];
-      });
-    })
-    .subscribe();
+  useEffect(() => {
+    const channel = supabase
+      .channel("study-groups")
+      .on("postgres_changes", { event: "INSERT", schema: "public", table: "study_groups" }, (payload) => {
+        const newGroup = mapDbGroup(payload.new as DbStudyGroup);
+        queryClient.setQueryData(["studyGroups"], (old: StudyGroup[] | undefined) => {
+          if (!old) return [newGroup];
+          if (old.some((g) => g.id === newGroup.id)) return old;
+          return [newGroup, ...old];
+        });
+      })
+      .subscribe();
+
+    return () => {
+      void supabase.removeChannel(channel);
+    };
+  }, [queryClient]);
 }

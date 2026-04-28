@@ -20,12 +20,7 @@ export function MySessions() {
   const { data: tutorBookings, isLoading: tutorLoading } = useTutorBookings(user?.id);
 
   // Set up real-time subscription for bookings updates
-  useEffect(() => {
-    const subscription = useBookingsSubscription(user?.id);
-    return () => {
-      supabase.removeChannel(subscription);
-    };
-  }, [user?.id]);
+  useBookingsSubscription(user?.id);
 
   // Select the appropriate bookings based on user role
   const sessions = useMemo(() => {
