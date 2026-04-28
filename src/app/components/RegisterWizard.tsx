@@ -589,7 +589,10 @@ export function RegisterWizard() {
 
   // Org submits directly from Step 2 above — no Step 3 for org.
   if (step === 4 && accountType !== "organization") {
-    const canSubmit = email.trim() !== "" && password.length >= 8 && password === confirmPassword;
+    const canSubmit = email.trim() !== "" && 
+                      password.length >= 8 && 
+                      password === confirmPassword &&
+                      (!codeSent || verificationCode.trim().length === 6);
 
     return (
       <div className="min-h-screen bg-gradient-to-br from-blue-50 to-purple-50 flex items-center justify-center p-4">
