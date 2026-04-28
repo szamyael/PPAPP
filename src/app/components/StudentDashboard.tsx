@@ -76,7 +76,7 @@ export function StudentDashboard() {
 
       const { data: monthData, error: monthError } = await supabase
         .from("bookings")
-        .select("start_time, end_time")
+        .select("start_time, hours")
         .eq("student_id", user.id)
         .eq("status", "completed")
         .gte("start_time", startOfMonth.toISOString());
@@ -84,9 +84,7 @@ export function StudentDashboard() {
       if (monthError) throw monthError;
 
       const totalHours = (monthData || []).reduce((sum, b) => {
-        const start = new Date(b.start_time);
-        const end = new Date(b.end_time);
-        return sum + (end.getTime() - start.getTime()) / (1000 * 60 * 60);
+        return sum + (b.hours || 0);
       }, 0);
 
       setStats(prev => ({

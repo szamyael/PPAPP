@@ -29,7 +29,7 @@ interface DbBooking {
   subject: string;
   topic: string;
   start_time: string;
-  end_time: string;
+  hours: number;
   status: string;
   other_party: {
     full_name: string;
@@ -60,7 +60,7 @@ async function fetchAllBookings(userId: string): Promise<Booking[]> {
       subject,
       topic,
       start_time,
-      end_time,
+      hours,
       status,
       other_party:profiles!bookings_${joinField}_fkey (
         full_name,
@@ -77,8 +77,8 @@ async function fetchAllBookings(userId: string): Promise<Booking[]> {
 
   const mapped: Booking[] = (data || []).map((s: any) => {
     const start = new Date(s.start_time);
-    const end = new Date(s.end_time);
-    const durationHours = (end.getTime() - start.getTime()) / (1000 * 60 * 60);
+    const end = new Date(start.getTime() + s.hours * 60 * 60 * 1000);
+    const durationHours = s.hours;
 
     return {
       id: s.id,
@@ -92,7 +92,7 @@ async function fetchAllBookings(userId: string): Promise<Booking[]> {
       status: s.status,
       rated: (s.ratings || []).length > 0,
       start_time: s.start_time,
-      end_time: s.end_time,
+      end_time: end.toISOString(),
     };
   });
 
@@ -107,7 +107,7 @@ async function fetchTutorBookings(userId: string): Promise<Booking[]> {
       subject,
       topic,
       start_time,
-      end_time,
+      hours,
       status,
       other_party:profiles!bookings_student_id_fkey (
         full_name,
@@ -124,8 +124,8 @@ async function fetchTutorBookings(userId: string): Promise<Booking[]> {
 
   const mapped: Booking[] = (data || []).map((s: any) => {
     const start = new Date(s.start_time);
-    const end = new Date(s.end_time);
-    const durationHours = (end.getTime() - start.getTime()) / (1000 * 60 * 60);
+    const end = new Date(start.getTime() + s.hours * 60 * 60 * 1000);
+    const durationHours = s.hours;
 
     return {
       id: s.id,
@@ -139,7 +139,7 @@ async function fetchTutorBookings(userId: string): Promise<Booking[]> {
       status: s.status,
       rated: (s.ratings || []).length > 0,
       start_time: s.start_time,
-      end_time: s.end_time,
+      end_time: end.toISOString(),
     };
   });
 
