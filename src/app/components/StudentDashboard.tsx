@@ -20,7 +20,6 @@ import { supabase } from "../lib/supabaseClient";
 interface DashboardStats {
   upcomingSessions: number;
   hoursThisMonth: number;
-  averageRating: number;
   progress: string;
 }
 
@@ -45,7 +44,6 @@ export function StudentDashboard() {
   const [stats, setStats] = useState<DashboardStats>({
     upcomingSessions: 0,
     hoursThisMonth: 0,
-    averageRating: 0,
     progress: "0%",
   });
   const [upcomingSessions, setUpcomingSessions] = useState<UpcomingSession[]>([]);
@@ -113,19 +111,7 @@ export function StudentDashboard() {
         return sum + (end.getTime() - start.getTime()) / (1000 * 60 * 60);
       }, 0);
 
-      // 3. Average Rating
-      const { data: ratingData, error: ratingError } = await supabase
-        .from("ratings")
-        .select("stars")
-        .eq("rated_user", user.id);
-
-      if (ratingError) throw ratingError;
-
-      const avgRating = ratingData.length > 0
-        ? ratingData.reduce((sum, r) => sum + r.stars, 0) / ratingData.length
-        : 0;
-
-      // 4. Fetch recent activities (Mocking logic based on real data)
+      // 3. Fetch recent activities (Mocking logic based on real data)
       // For now, we'll fetch newsfeed posts as recent activity if no direct events
       const { data: newsData } = await supabase
         .from("newsfeed_posts")
@@ -145,7 +131,6 @@ export function StudentDashboard() {
       setStats({
         upcomingSessions: (sessionsData || []).length,
         hoursThisMonth: Number(totalHours.toFixed(1)),
-        averageRating: Number(avgRating.toFixed(1)),
         progress: "+0%", // Progress calculation would need historical data
       });
 
@@ -216,11 +201,6 @@ export function StudentDashboard() {
               icon={<Clock className="h-8 w-8 text-purple-600" />}
               label="Hours This Month"
               value={stats.hoursThisMonth.toString()}
-            />
-            <StatCard
-              icon={<Star className="h-8 w-8 text-yellow-600" />}
-              label="Average Rating"
-              value={stats.averageRating > 0 ? stats.averageRating.toString() : "N/A"}
             />
             <StatCard
               icon={<TrendingUp className="h-8 w-8 text-green-600" />}
