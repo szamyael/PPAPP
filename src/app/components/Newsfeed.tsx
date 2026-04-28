@@ -194,18 +194,18 @@ export function Newsfeed() {
                 <CardHeader>
                   <div className="flex items-start gap-3">
                     <Avatar className="h-10 w-10 bg-blue-600 text-white flex items-center justify-center rounded-full">
-                      {post.avatar || (post.author || "?").slice(0, 2).toUpperCase()}
+                      {post.author_avatar || (post.author_name || "?").slice(0, 2).toUpperCase()}
                     </Avatar>
                     <div className="flex-1">
                       <div className="flex items-center justify-between">
                         <div>
-                          <p className="font-semibold">{post.author}</p>
+                          <p className="font-semibold">{post.author_name}</p>
                           <p className="text-sm text-gray-500">
-                            {post.role.charAt(0).toUpperCase() + post.role.slice(1)} • {post.time}
+                            {post.author_role.charAt(0).toUpperCase() + post.author_role.slice(1)} • {post.timeAgo}
                           </p>
                         </div>
                         <div className="flex items-center gap-2">
-                          {(POST_TYPES as any)[post.type]?.icon}
+                          {(POST_TYPES as any)[post.post_type]?.icon}
                         </div>
                       </div>
                     </div>
@@ -214,16 +214,15 @@ export function Newsfeed() {
                 <CardContent>
                   <p className="text-gray-900 mb-4 whitespace-pre-wrap">{post.content}</p>
                   <div className="flex items-center gap-6 pt-3 border-t border-gray-200">
-                    <button 
-                      onClick={() => handleLike(post.id)}
+                    <button
                       className="flex items-center gap-2 text-gray-600 hover:text-red-600 transition-colors"
                     >
                       <Heart className="h-5 w-5" />
-                      <span className="text-sm">{post.likes}</span>
+                      <span className="text-sm">{post.likes_count}</span>
                     </button>
                     <button className="flex items-center gap-2 text-gray-600 hover:text-blue-600 transition-colors">
                       <MessageCircle className="h-5 w-5" />
-                      <span className="text-sm">{post.comments}</span>
+                      <span className="text-sm">{post.comments_count}</span>
                     </button>
                     <button className="flex items-center gap-2 text-gray-600 hover:text-green-600 transition-colors">
                       <Share2 className="h-5 w-5" />
