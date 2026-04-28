@@ -136,23 +136,15 @@ export const AuthProvider: React.FC<{ children: React.ReactNode }> = ({
     // Timeout to prevent indefinite loading state
     const timeoutId = setTimeout(() => {
       if (mounted) {
-        console.warn('Auth initialization timed out, continuing without session');
+        console.warn("Auth initialization taking longer than expected...");
         setLoading(false);
       }
-    }, 5000); // Reduced from 10s to 5s for better UX
+    }, 10000); // 10s safety net for UI
 
     const init = async () => {
       try {
-        // Try to restore session with a short timeout
-        const sessionPromise = supabase.auth.getSession();
-        const timeoutPromise = new Promise((_, reject) =>
-          setTimeout(() => reject(new Error('Session fetch timeout')), 4000)
-        );
-
-        const { data: { session: existingSession } } = await Promise.race([
-          sessionPromise,
-          timeoutPromise,
-        ]) as any;
+        // Try to restore session
+        const { data: { session: existingSession } } = await supabase.auth.getSession();
 
         if (existingSession && mounted) {
           setSession(existingSession);
@@ -160,13 +152,11 @@ export const AuthProvider: React.FC<{ children: React.ReactNode }> = ({
             const appUser = await loadProfile(existingSession);
             if (mounted) setUser(appUser);
           } catch (profileError) {
-            console.error('Profile load error:', profileError);
-            // Continue without full profile
+            console.error("Profile load error during init:", profileError);
           }
         }
       } catch (error) {
-        console.error('Auth initialization error:', error);
-        // Continue without session - user can login manually
+        console.error("Auth initialization error:", error);
       } finally {
         clearTimeout(timeoutId);
         if (mounted) setLoading(false);
