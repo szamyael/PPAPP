@@ -20,32 +20,32 @@ DECLARE
 BEGIN
   -- Insert Admin if not exists
   IF NOT EXISTS (SELECT 1 FROM auth.users WHERE email = 'admin@piyupairlspu.com') THEN
-    INSERT INTO auth.users (instance_id, id, aud, role, email, encrypted_password, email_confirmed_at, raw_user_meta_data, created_at)
-    VALUES (v_instance_id, v_admin_id, 'authenticated', 'authenticated', 'admin@piyupairlspu.com', extensions.crypt('admin123', extensions.gen_salt('bf')), now(), '{"role":"admin", "full_name":"Admin User"}', now());
+    INSERT INTO auth.users (instance_id, id, aud, role, email, encrypted_password, email_confirmed_at, raw_user_meta_data, created_at, confirmation_token, recovery_token, email_change_token_new, phone_change_token)
+    VALUES (v_instance_id, v_admin_id, 'authenticated', 'authenticated', 'admin@piyupairlspu.com', extensions.crypt('admin123', extensions.gen_salt('bf')), now(), '{"role":"admin", "full_name":"Admin User"}', now(), '', '', '', '');
   ELSE
     SELECT id INTO v_admin_id FROM auth.users WHERE email = 'admin@piyupairlspu.com';
   END IF;
 
   -- Insert Organization if not exists
   IF NOT EXISTS (SELECT 1 FROM auth.users WHERE email = 'orgz@piyupairlspu.com') THEN
-    INSERT INTO auth.users (instance_id, id, aud, role, email, encrypted_password, email_confirmed_at, raw_user_meta_data, created_at)
-    VALUES (v_instance_id, v_org_id, 'authenticated', 'authenticated', 'orgz@piyupairlspu.com', extensions.crypt('admin123', extensions.gen_salt('bf')), now(), '{"role":"organization", "full_name":"Test Organization"}', now());
+    INSERT INTO auth.users (instance_id, id, aud, role, email, encrypted_password, email_confirmed_at, raw_user_meta_data, created_at, confirmation_token, recovery_token, email_change_token_new, phone_change_token)
+    VALUES (v_instance_id, v_org_id, 'authenticated', 'authenticated', 'orgz@piyupairlspu.com', extensions.crypt('admin123', extensions.gen_salt('bf')), now(), '{"role":"organization", "full_name":"Test Organization"}', now(), '', '', '', '');
   ELSE
     SELECT id INTO v_org_id FROM auth.users WHERE email = 'orgz@piyupairlspu.com';
   END IF;
 
   -- Insert Tutor if not exists
   IF NOT EXISTS (SELECT 1 FROM auth.users WHERE email = 'tutor@piyupairlspu.com') THEN
-    INSERT INTO auth.users (instance_id, id, aud, role, email, encrypted_password, email_confirmed_at, raw_user_meta_data, created_at)
-    VALUES (v_instance_id, v_tutor_id, 'authenticated', 'authenticated', 'tutor@piyupairlspu.com', extensions.crypt('admin123', extensions.gen_salt('bf')), now(), '{"role":"tutor", "full_name":"Test Tutor"}', now());
+    INSERT INTO auth.users (instance_id, id, aud, role, email, encrypted_password, email_confirmed_at, raw_user_meta_data, created_at, confirmation_token, recovery_token, email_change_token_new, phone_change_token)
+    VALUES (v_instance_id, v_tutor_id, 'authenticated', 'authenticated', 'tutor@piyupairlspu.com', extensions.crypt('admin123', extensions.gen_salt('bf')), now(), '{"role":"tutor", "full_name":"Test Tutor"}', now(), '', '', '', '');
   ELSE
     SELECT id INTO v_tutor_id FROM auth.users WHERE email = 'tutor@piyupairlspu.com';
   END IF;
 
   -- Insert Student if not exists
   IF NOT EXISTS (SELECT 1 FROM auth.users WHERE email = 'student@piyupairlspu.com') THEN
-    INSERT INTO auth.users (instance_id, id, aud, role, email, encrypted_password, email_confirmed_at, raw_user_meta_data, created_at)
-    VALUES (v_instance_id, v_student_id, 'authenticated', 'authenticated', 'student@piyupairlspu.com', extensions.crypt('admin123', extensions.gen_salt('bf')), now(), '{"role":"student", "full_name":"Test Student"}', now());
+    INSERT INTO auth.users (instance_id, id, aud, role, email, encrypted_password, email_confirmed_at, raw_user_meta_data, created_at, confirmation_token, recovery_token, email_change_token_new, phone_change_token)
+    VALUES (v_instance_id, v_student_id, 'authenticated', 'authenticated', 'student@piyupairlspu.com', extensions.crypt('admin123', extensions.gen_salt('bf')), now(), '{"role":"student", "full_name":"Test Student"}', now(), '', '', '', '');
   ELSE
     SELECT id INTO v_student_id FROM auth.users WHERE email = 'student@piyupairlspu.com';
   END IF;
