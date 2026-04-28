@@ -21,28 +21,11 @@ export function Login() {
     e.preventDefault();
     setSubmitting(true);
 
-    const ok = await login(formData.email, formData.password);
-
+    const role = await login(formData.email, formData.password);
     setSubmitting(false);
 
-    if (ok) {
-      // Route to correct dashboard based on role
-      // AuthContext sets user; nav happens via the role
-      const stored = await import("../lib/supabaseClient").then(m =>
-        m.supabase.auth.getSession()
-      );
-      const userId = stored.data.session?.user?.id;
-
-      // Fetch role
-      if (userId) {
-        const { data: profile } = await import("../lib/supabaseClient").then(m =>
-          m.supabase.from("profiles").select("role").eq("id", userId).maybeSingle()
-        );
-        const role = profile?.role ?? "student";
-        navigate(`/dashboard/${role}`, { replace: true });
-      } else {
-        navigate("/", { replace: true });
-      }
+    if (role) {
+      navigate(`/dashboard/${role}`, { replace: true });
     } else {
       toast.error(loginError ?? "Invalid email or password.");
     }

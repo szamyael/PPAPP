@@ -23,7 +23,7 @@ interface AuthContextType {
   session: Session | null;
   loading: boolean;
   loginError: string | null;
-  login: (email: string, password: string) => Promise<boolean>;
+  login: (email: string, password: string) => Promise<string | null>;
   logout: () => void;
   register: (userData: RegisterPayload) => Promise<boolean>;
   verifyOtp: (email: string, token: string) => Promise<boolean>;
@@ -148,7 +148,7 @@ export const AuthProvider: React.FC<{ children: React.ReactNode }> = ({
   }, []);
 
   // ── Login ──────────────────────────────────────────────────────────
-  const login = async (email: string, password: string): Promise<boolean> => {
+  const login = async (email: string, password: string): Promise<string | null> => {
     setLoginError(null);
 
     const { data, error } = await supabase.auth.signInWithPassword({
@@ -158,7 +158,7 @@ export const AuthProvider: React.FC<{ children: React.ReactNode }> = ({
 
     if (error || !data.user) {
       setLoginError(error?.message ?? "Login failed");
-      return false;
+      return null;
     }
 
     // Fetch profile to check approval status
@@ -171,7 +171,7 @@ export const AuthProvider: React.FC<{ children: React.ReactNode }> = ({
     if (profileError || !profile) {
       await supabase.auth.signOut();
       setLoginError("Profile not found. Please contact support.");
-      return false;
+      return null;
     }
 
     if (profile.approval_status === "pending") {
@@ -181,18 +181,18 @@ export const AuthProvider: React.FC<{ children: React.ReactNode }> = ({
           ? "Your tutor application is pending review by your organization."
           : "Your account is pending admin approval. You'll receive an email when approved."
       );
-      return false;
+      return null;
     }
 
     if (profile.approval_status === "rejected") {
       await supabase.auth.signOut();
       setLoginError("Your account application was not approved. Please contact support.");
-      return false;
+      return null;
     }
 
     const appUser = profileToUser(data.user.id, data.user.email ?? "", profile);
     setUser(appUser);
-    return true;
+    return profile.role;
   };
 
   // ── Logout ─────────────────────────────────────────────────────────
