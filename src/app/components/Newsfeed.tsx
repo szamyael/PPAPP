@@ -4,7 +4,7 @@ import { Button } from "./ui/button";
 import { Textarea } from "./ui/textarea";
 import { Card, CardContent, CardHeader } from "./ui/card";
 import { Avatar } from "./ui/avatar";
-import { Heart, MessageCircle, Share2, Send, Calendar, BookOpen, Flag, Bell } from "lucide-react";
+import { Heart, MessageCircle, Share2, Send, Calendar, BookOpen, Flag, Bell, Loader2 } from "lucide-react";
 import { toast } from "sonner";
 import { supabase } from "../lib/supabaseClient";
 import { useAuth } from "../contexts/AuthContext";
