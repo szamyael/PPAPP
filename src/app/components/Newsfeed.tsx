@@ -1,10 +1,11 @@
 import { useEffect, useState } from "react";
+import { useNavigate } from "react-router";
 import { Navigation } from "./Navigation";
 import { Button } from "./ui/button";
 import { Textarea } from "./ui/textarea";
 import { Card, CardContent, CardHeader } from "./ui/card";
 import { Avatar } from "./ui/avatar";
-import { Heart, MessageCircle, Share2, Send, Calendar, BookOpen, Flag, Bell, Loader2 } from "lucide-react";
+import { Heart, MessageCircle, Share2, Send, Calendar, BookOpen, Flag, Bell, Loader2, UserPlus } from "lucide-react";
 import { toast } from "sonner";
 import { supabase } from "../lib/supabaseClient";
 import { useAuth } from "../contexts/AuthContext";
@@ -20,6 +21,7 @@ const POST_TYPES = {
 
 interface DbFeedPost {
   id: string;
+  author_id: string;
   author_name: string;
   author_role: string;
   author_avatar: string;
@@ -50,21 +52,24 @@ function mapDbPost(row: DbFeedPost): FeedPost {
 
 export function Newsfeed() {
   const { user, session } = useAuth();
+  const navigate = useNavigate();
   const [newPost,   setNewPost]   = useState("");
   const [posts,     setPosts]     = useState<FeedPost[]>([]);
   const [loading,   setLoading]   = useState(true);
   const [reporting, setReporting] = useState<Record<string, boolean>>({});
+  const [following, setFollowing] = useState<Set<string>>(new Set());
 
   useEffect(() => {
     fetchPosts();
-  }, []);
+    if (user?.id) fetchFollowing();
+  }, [user?.id]);
 
   const fetchPosts = async () => {
     setLoading(true);
     try {
       const { data, error } = await supabase
         .from("newsfeed_posts")
-        .select("id, author_name, author_role, author_avatar, post_type, content, likes_count, comments_count, created_at")
+        .select("id, author_id, author_name, author_role, author_avatar, post_type, content, likes_count, comments_count, created_at")
         .order("created_at", { ascending: false });
 
       if (error) throw error;
@@ -116,6 +121,67 @@ export function Newsfeed() {
         toast.success("Post shared successfully!");
         setNewPost("");
       });
+  };
+
+  const fetchFollowing = async () => {
+    if (!user?.id) return;
+    try {
+      const { data, error } = await supabase
+        .from("user_connections")
+        .select("following_id")
+        .eq("follower_id", user.id)
+        .eq("status", "accepted");
+
+      if (error) throw error;
+      const followingSet = new Set((data || []).map((c: any) => c.following_id));
+      setFollowing(followingSet);
+    } catch (error) {
+      console.error("Error fetching following:", error);
+    }
+  };
+
+  const handleFollow = async (authorId: string) => {
+    if (!user?.id) {
+      toast.error("You must be logged in to follow users");
+      return;
+    }
+
+    try {
+      const isFollowing = following.has(authorId);
+
+      if (isFollowing) {
+        await supabase
+          .from("user_connections")
+          .delete()
+          .eq("follower_id", user.id)
+          .eq("following_id", authorId);
+
+        setFollowing((prev) => {
+          const newSet = new Set(prev);
+          newSet.delete(authorId);
+          return newSet;
+        });
+      } else {
+        await supabase.from("user_connections").insert({
+          follower_id: user.id,
+          following_id: authorId,
+          status: "accepted",
+        });
+
+        setFollowing((prev) => new Set(prev).add(authorId));
+      }
+    } catch (error) {
+      console.error("Error updating follow:", error);
+      toast.error("Failed to update follow status");
+    }
+  };
+
+  const handleMessage = (authorId: string) => {
+    navigate(`/messages?user_id=${authorId}`);
+  };
+
+  const handleViewProfile = (authorId: string) => {
+    navigate(`/profile/${authorId}`);
   };
 
   // ── Report a post ────────────────────────────────────────────────────
@@ -196,18 +262,40 @@ export function Newsfeed() {
                     <Avatar className="h-10 w-10 bg-blue-600 text-white flex items-center justify-center rounded-full">
                       {post.author_avatar || (post.author_name || "?").slice(0, 2).toUpperCase()}
                     </Avatar>
-                    <div className="flex-1">
-                      <div className="flex items-center justify-between">
-                        <div>
-                          <p className="font-semibold">{post.author_name}</p>
+                    <div className="flex-1 min-w-0">
+                      <div className="flex items-center justify-between gap-2 mb-2">
+                        <div className="cursor-pointer hover:underline min-w-0" onClick={() => handleViewProfile(post.author_id)}>
+                          <p className="font-semibold truncate">{post.author_name}</p>
                           <p className="text-sm text-gray-500">
                             {post.author_role.charAt(0).toUpperCase() + post.author_role.slice(1)} • {post.timeAgo}
                           </p>
                         </div>
-                        <div className="flex items-center gap-2">
+                        <div className="flex-shrink-0">
                           {(POST_TYPES as any)[post.post_type]?.icon}
                         </div>
                       </div>
+                      {/* Follow/Message buttons for other users */}
+                      {user?.id !== post.author_id && (
+                        <div className="flex gap-2">
+                          <Button
+                            size="sm"
+                            variant="ghost"
+                            className="h-7 px-2 text-xs"
+                            onClick={() => handleFollow(post.author_id)}
+                          >
+                            {following.has(post.author_id) ? "✓ Following" : "Follow"}
+                          </Button>
+                          <Button
+                            size="sm"
+                            variant="ghost"
+                            className="h-7 px-2 text-xs"
+                            onClick={() => handleMessage(post.author_id)}
+                          >
+                            <MessageCircle className="h-3 w-3 mr-1" />
+                            Message
+                          </Button>
+                        </div>
+                      )}
                     </div>
                   </div>
                 </CardHeader>
