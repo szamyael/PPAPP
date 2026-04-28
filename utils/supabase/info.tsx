@@ -21,8 +21,19 @@ if (
   isMissingEnv(supabaseFunctionsBaseUrl) ||
   isMissingEnv(publicAnonKey)
 ) {
+  const missing = [
+    ["VITE_SUPABASE_PROJECT_ID", projectId],
+    ["VITE_SUPABASE_URL", supabaseUrl],
+    ["VITE_SUPABASE_FUNCTIONS_BASE_URL", supabaseFunctionsBaseUrl],
+    ["VITE_SUPABASE_ANON_KEY", publicAnonKey],
+  ]
+    .filter(([, v]) => isMissingEnv(v))
+    .map(([k, v]) => `${k}=${JSON.stringify(v)}`)
+    .join(", ");
+
   throw new Error(
     `[Piyupair] Missing environment variables. ` +
-    `Ensure VITE_SUPABASE_PROJECT_ID, VITE_SUPABASE_URL, VITE_SUPABASE_FUNCTIONS_BASE_URL, and VITE_SUPABASE_ANON_KEY are set.`
+    `Ensure VITE_SUPABASE_PROJECT_ID, VITE_SUPABASE_URL, VITE_SUPABASE_FUNCTIONS_BASE_URL, and VITE_SUPABASE_ANON_KEY are set. ` +
+    `Missing: ${missing}`
   );
 }

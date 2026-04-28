@@ -13,9 +13,18 @@ const isMissingEnv = (v: unknown) => {
 };
 
 if (isMissingEnv(supabaseUrl) || isMissingEnv(supabaseAnonKey)) {
+  const missing = [
+    ["VITE_SUPABASE_URL", supabaseUrl],
+    ["VITE_SUPABASE_ANON_KEY", supabaseAnonKey],
+  ]
+    .filter(([, v]) => isMissingEnv(v))
+    .map(([k, v]) => `${k}=${JSON.stringify(v)}`)
+    .join(", ");
+
   throw new Error(
     "[Piyupair] Missing Supabase env vars. " +
-    "Copy .env.example to .env and fill in VITE_SUPABASE_URL and VITE_SUPABASE_ANON_KEY."
+    "Copy .env.example to .env and fill in VITE_SUPABASE_URL and VITE_SUPABASE_ANON_KEY. " +
+    `Missing: ${missing}`
   );
 }
 
