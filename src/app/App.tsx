@@ -1,4 +1,4 @@
-import { Suspense, useState, useEffect } from "react";
+import { Suspense } from "react";
 import { RouterProvider } from "react-router";
 import { router } from "./routes";
 import { AuthProvider } from "./contexts/AuthContext";
@@ -11,31 +11,9 @@ function LoadingScreen() {
     <div className="min-h-screen flex items-center justify-center bg-gray-50">
       <div className="text-center">
         <div className="animate-spin rounded-full h-12 w-12 border-b-2 border-blue-600 mx-auto mb-4"></div>
-        <p className="text-gray-600">Loading...</p>
+        <p className="text-gray-600">Initializing...</p>
       </div>
     </div>
-  );
-}
-
-function AppContent() {
-  const [mounted, setMounted] = useState(false);
-
-  useEffect(() => {
-    // Small delay to ensure providers are initialized
-    const timer = setTimeout(() => {
-      setMounted(true);
-    }, 100);
-    return () => clearTimeout(timer);
-  }, []);
-
-  if (!mounted) {
-    return <LoadingScreen />;
-  }
-
-  return (
-    <Suspense fallback={<LoadingScreen />}>
-      <RouterProvider router={router} />
-    </Suspense>
   );
 }
 
@@ -44,10 +22,13 @@ export default function App() {
     <ErrorBoundary>
       <QueryProvider>
         <AuthProvider>
-          <AppContent />
+          <Suspense fallback={<LoadingScreen />}>
+            <RouterProvider router={router} />
+          </Suspense>
           <Toaster position="top-right" />
         </AuthProvider>
       </QueryProvider>
     </ErrorBoundary>
   );
 }
+
