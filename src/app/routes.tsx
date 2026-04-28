@@ -13,6 +13,7 @@ import { Messages } from "./components/Messages";
 import { StudyGroups } from "./components/StudyGroups";
 import { OpenLibrary } from "./components/OpenLibrary";
 import { FindTutors } from "./components/FindTutors";
+import { FindPeople } from "./components/FindPeople";
 import { BookingForm } from "./components/BookingForm";
 import { Payment } from "./components/Payment";
 import { MySessions } from "./components/MySessions";
@@ -23,6 +24,7 @@ import { VideoCall } from "./components/VideoCall";
 import { ClassroomCall } from "./components/ClassroomCall";
 import { RateSession } from "./components/RateSession";
 import { StudyGroupDetail } from "./components/StudyGroupDetail";
+import { ProfileView } from "./components/ProfileView";
 import { NotFound } from "./components/NotFound";
 
 export const router = createBrowserRouter([
@@ -43,6 +45,8 @@ export const router = createBrowserRouter([
       { path: "study-groups", Component: StudyGroups },
       { path: "library", Component: OpenLibrary },
       { path: "find-tutors", Component: FindTutors },
+      { path: "find-people", Component: FindPeople },
+      { path: "profile/:userId", Component: ProfileView },
       { path: "book/:tutorId", Component: BookingForm },
       { path: "payment", Component: Payment },
       { path: "sessions", Component: MySessions },
