@@ -15,21 +15,13 @@ import {
   MessageSquare,
   Loader2,
 } from "lucide-react";
+import { useUpcomingSessions, useNewsfeedPosts } from "../lib/hooks";
 import { supabase } from "../lib/supabaseClient";
 
 interface DashboardStats {
   upcomingSessions: number;
   hoursThisMonth: number;
-  averageRating: number;
   progress: string;
-}
-
-interface UpcomingSession {
-  id: string;
-  subject: string;
-  tutor_name: string;
-  date: string;
-  time: string;
 }
 
 interface RecentActivity {
@@ -45,12 +37,14 @@ export function StudentDashboard() {
   const [stats, setStats] = useState<DashboardStats>({
     upcomingSessions: 0,
     hoursThisMonth: 0,
-    averageRating: 0,
     progress: "0%",
   });
-  const [upcomingSessions, setUpcomingSessions] = useState<UpcomingSession[]>([]);
   const [recentActivities, setRecentActivities] = useState<RecentActivity[]>([]);
   const [loading, setLoading] = useState(true);
+
+  // Use React Query for upcoming sessions and newsfeed
+  const { data: upcomingSessionsData } = useUpcomingSessions(user?.id);
+  const { data: newsfeedData } = useNewsfeedPosts();
 
   useEffect(() => {
     if (!user || user.role !== "student") {
@@ -60,47 +54,29 @@ export function StudentDashboard() {
     fetchDashboardData();
   }, [user, navigate]);
 
+  // Update upcoming sessions from React Query data
+  useEffect(() => {
+    if (upcomingSessionsData) {
+      // Stats are already calculated in the hook
+      setStats(prev => ({
+        ...prev,
+        upcomingSessions: upcomingSessionsData.length,
+      }));
+    }
+  }, [upcomingSessionsData]);
+
   const fetchDashboardData = async () => {
     if (!user) return;
     setLoading(true);
     try {
-      // 1. Fetch upcoming sessions
-      const { data: sessionsData, error: sessionsError } = await supabase
-        .from("bookings")
-        .select(`
-          id,
-          subject,
-          start_time,
-          tutor:profiles!bookings_tutor_id_fkey (
-            full_name
-          )
-        `)
-        .eq("student_id", user.id)
-        .gte("start_time", new Date().toISOString())
-        .eq("status", "confirmed")
-        .order("start_time", { ascending: true })
-        .limit(3);
-
-      if (sessionsError) throw sessionsError;
-
-      setUpcomingSessions(
-        (sessionsData || []).map((s: any) => ({
-          id: s.id,
-          subject: s.subject,
-          tutor_name: s.tutor?.full_name || "Unknown Tutor",
-          date: new Date(s.start_time).toLocaleDateString("en-US", { month: "short", day: "numeric", year: "numeric" }),
-          time: new Date(s.start_time).toLocaleTimeString("en-US", { hour: "numeric", minute: "2-digit" }),
-        }))
-      );
-
-      // 2. Fetch stats (Hours this month)
+      // Fetch stats (Hours this month)
       const startOfMonth = new Date();
       startOfMonth.setDate(1);
       startOfMonth.setHours(0, 0, 0, 0);
 
       const { data: monthData, error: monthError } = await supabase
         .from("bookings")
-        .select("start_time, end_time")
+        .select("start_time, hours")
         .eq("student_id", user.id)
         .eq("status", "completed")
         .gte("start_time", startOfMonth.toISOString());
@@ -108,46 +84,14 @@ export function StudentDashboard() {
       if (monthError) throw monthError;
 
       const totalHours = (monthData || []).reduce((sum, b) => {
-        const start = new Date(b.start_time);
-        const end = new Date(b.end_time);
-        return sum + (end.getTime() - start.getTime()) / (1000 * 60 * 60);
+        return sum + (b.hours || 0);
       }, 0);
 
-      // 3. Average Rating
-      const { data: ratingData, error: ratingError } = await supabase
-        .from("ratings")
-        .select("stars")
-        .eq("rated_user", user.id);
-
-      if (ratingError) throw ratingError;
-
-      const avgRating = ratingData.length > 0
-        ? ratingData.reduce((sum, r) => sum + r.stars, 0) / ratingData.length
-        : 0;
-
-      // 4. Fetch recent activities (Mocking logic based on real data)
-      // For now, we'll fetch newsfeed posts as recent activity if no direct events
-      const { data: newsData } = await supabase
-        .from("newsfeed_posts")
-        .select("id, author_name, content, created_at")
-        .order("created_at", { ascending: false })
-        .limit(3);
-
-      setRecentActivities(
-        (newsData || []).map((n: any) => ({
-          id: n.id,
-          type: "message",
-          text: `${n.author_name} shared: "${n.content.slice(0, 30)}..."`,
-          time: toRelativeTime(n.created_at),
-        }))
-      );
-
-      setStats({
-        upcomingSessions: (sessionsData || []).length,
+      setStats(prev => ({
+        ...prev,
         hoursThisMonth: Number(totalHours.toFixed(1)),
-        averageRating: Number(avgRating.toFixed(1)),
         progress: "+0%", // Progress calculation would need historical data
-      });
+      }));
 
     } catch (error) {
       console.error("Dashboard fetch error:", error);
@@ -156,15 +100,18 @@ export function StudentDashboard() {
     }
   };
 
-  function toRelativeTime(createdAt: string): string {
-    const diff = Date.now() - new Date(createdAt).getTime();
-    const minutes = Math.floor(diff / 60000);
-    if (minutes < 1) return "Just now";
-    if (minutes < 60) return `${minutes}m ago`;
-    const hours = Math.floor(minutes / 60);
-    if (hours < 24) return `${hours}h ago`;
-    return `${Math.floor(hours / 24)}d ago`;
-  }
+  // Process newsfeed data for recent activities
+  useEffect(() => {
+    if (newsfeedData && newsfeedData.length > 0) {
+      const activities: RecentActivity[] = newsfeedData.slice(0, 3).map((n) => ({
+        id: n.id,
+        type: "message" as const,
+        text: `${n.author_name} shared: "${n.content.slice(0, 30)}..."`,
+        time: n.timeAgo,
+      }));
+      setRecentActivities(activities);
+    }
+  }, [newsfeedData]);
 
   if (!user) return null;
 
@@ -216,11 +163,6 @@ export function StudentDashboard() {
               icon={<Clock className="h-8 w-8 text-purple-600" />}
               label="Hours This Month"
               value={stats.hoursThisMonth.toString()}
-            />
-            <StatCard
-              icon={<Star className="h-8 w-8 text-yellow-600" />}
-              label="Average Rating"
-              value={stats.averageRating > 0 ? stats.averageRating.toString() : "N/A"}
             />
             <StatCard
               icon={<TrendingUp className="h-8 w-8 text-green-600" />}
@@ -289,11 +231,11 @@ export function StudentDashboard() {
             <CardContent>
               {loading ? (
                 <div className="flex justify-center py-8"><Loader2 className="animate-spin text-blue-600" /></div>
-              ) : upcomingSessions.length === 0 ? (
+              ) : !upcomingSessionsData || upcomingSessionsData.length === 0 ? (
                 <p className="text-center py-8 text-gray-500">No upcoming sessions</p>
               ) : (
                 <div className="space-y-4">
-                  {upcomingSessions.map((s) => (
+                  {upcomingSessionsData.map((s) => (
                     <SessionItem
                       key={s.id}
                       subject={s.subject}

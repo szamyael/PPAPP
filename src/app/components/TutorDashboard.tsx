@@ -63,8 +63,8 @@ export function TutorDashboard() {
           id,
           subject,
           start_time,
-          end_time,
-          student:profiles!bookings_student_id_fkey (
+          hours,
+          student:profiles!bookings_student_profile_fkey (
             full_name
           )
         `)
@@ -79,8 +79,7 @@ export function TutorDashboard() {
       setUpcomingSessions(
         (sessionsData || []).map((s: any) => {
           const start = new Date(s.start_time);
-          const end = new Date(s.end_time);
-          const durationHours = (end.getTime() - start.getTime()) / (1000 * 60 * 60);
+          const durationHours = s.hours || 1;
 
           return {
             id: s.id,
@@ -118,7 +117,7 @@ export function TutorDashboard() {
           stars,
           comment,
           proof_url,
-          student:profiles!ratings_rated_by_fkey (
+          student:profiles!ratings_rated_by_profile_fkey (
             full_name
           )
         `)

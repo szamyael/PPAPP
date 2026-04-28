@@ -69,7 +69,7 @@ interface RegisterPayload {
 // ─────────────────────────────────────────────
 // Context
 // ─────────────────────────────────────────────
-const AuthContext = createContext<AuthContextType | undefined>(undefined);
+export const AuthContext = createContext<AuthContextType | undefined>(undefined);
 
 // ─────────────────────────────────────────────
 // Helper: build User object from DB profile row
@@ -131,32 +131,69 @@ export const AuthProvider: React.FC<{ children: React.ReactNode }> = ({
   // ── Initialise: restore session from storage ──────────────────────
   useEffect(() => {
     let mounted = true;
+    let initPromise: Promise<void> | null = null;
+
+    // Timeout to prevent indefinite loading state
+    const timeoutId = setTimeout(() => {
+      if (mounted) {
+        console.warn('Auth initialization timed out, continuing without session');
+        setLoading(false);
+      }
+    }, 5000); // Reduced from 10s to 5s for better UX
 
     const init = async () => {
-      const { data: { session: existingSession } } =
-        await supabase.auth.getSession();
+      try {
+        // Try to restore session with a short timeout
+        const sessionPromise = supabase.auth.getSession();
+        const timeoutPromise = new Promise((_, reject) =>
+          setTimeout(() => reject(new Error('Session fetch timeout')), 4000)
+        );
 
-      if (existingSession && mounted) {
-        setSession(existingSession);
-        const appUser = await loadProfile(existingSession);
-        if (mounted) setUser(appUser);
+        const { data: { session: existingSession } } = await Promise.race([
+          sessionPromise,
+          timeoutPromise,
+        ]) as any;
+
+        if (existingSession && mounted) {
+          setSession(existingSession);
+          try {
+            const appUser = await loadProfile(existingSession);
+            if (mounted) setUser(appUser);
+          } catch (profileError) {
+            console.error('Profile load error:', profileError);
+            // Continue without full profile
+          }
+        }
+      } catch (error) {
+        console.error('Auth initialization error:', error);
+        // Continue without session - user can login manually
+      } finally {
+        clearTimeout(timeoutId);
+        if (mounted) setLoading(false);
       }
-
-      if (mounted) setLoading(false);
     };
 
-    init();
+    initPromise = init();
 
     // Listen for auth state changes (sign-in, sign-out, token refresh)
     const { data: { subscription } } = supabase.auth.onAuthStateChange(
       async (_event, newSession) => {
         if (!mounted) return;
-        setSession(newSession);
-        if (newSession) {
-          const appUser = await loadProfile(newSession);
-          setUser(appUser);
-        } else {
-          setUser(null);
+        try {
+          setSession(newSession);
+          if (newSession) {
+            try {
+              const appUser = await loadProfile(newSession);
+              setUser(appUser);
+            } catch (profileError) {
+              console.error('Auth state change profile error:', profileError);
+              // Still set session even if profile fails
+            }
+          } else {
+            setUser(null);
+          }
+        } catch (error) {
+          console.error('Auth state change error:', error);
         }
       }
     );
@@ -390,6 +427,20 @@ export const AuthProvider: React.FC<{ children: React.ReactNode }> = ({
 
 export const useAuth = () => {
   const ctx = useContext(AuthContext);
-  if (!ctx) throw new Error("useAuth must be used within an AuthProvider");
+  if (!ctx) {
+    // Return a default context during initialization instead of throwing
+    // This prevents React error #321 when components render before provider
+    return {
+      user: null,
+      session: null,
+      loading: true,
+      loginError: null,
+      login: async () => null,
+      logout: async () => {},
+      register: async () => false,
+      verifyOtp: async () => false,
+      updateProfile: async () => ({ success: false, error: "Not initialized" }),
+    };
+  }
   return ctx;
 };

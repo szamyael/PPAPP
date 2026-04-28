@@ -1,10 +1,12 @@
--- Migration: Study Group Enhancements
+-- Migration: Study Group Members table
+-- Ensure study_groups table exists first
 create table if not exists public.study_group_members (
   id uuid primary key default gen_random_uuid(),
   group_id uuid not null references public.study_groups(id) on delete cascade,
   user_id uuid not null references auth.users(id) on delete cascade,
   role text not null default 'member' check (role in ('admin', 'member')),
   created_at timestamptz not null default now(),
+  updated_at timestamptz default now(),
   unique (group_id, user_id)
 );
 
@@ -26,3 +28,4 @@ begin
     alter publication supabase_realtime add table public.study_group_members;
   end if;
 end$$;
+
