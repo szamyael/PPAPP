@@ -1,14 +1,15 @@
-import { useEffect, useState } from "react";
+import { useState } from "react";
 import { Navigation } from "./Navigation";
 import { Button } from "./ui/button";
 import { Textarea } from "./ui/textarea";
 import { Card, CardContent, CardHeader } from "./ui/card";
 import { Avatar } from "./ui/avatar";
-import { Heart, MessageCircle, Share2, Send, Calendar, BookOpen, Flag } from "lucide-react";
+import { Heart, MessageCircle, Share2, Send, Calendar, BookOpen, Flag, Bell, Loader2 } from "lucide-react";
 import { toast } from "sonner";
 import { supabase } from "../lib/supabaseClient";
 import { useAuth } from "../contexts/AuthContext";
 import { publicAnonKey, supabaseFunctionsBaseUrl } from "../../../utils/supabase/info";
+import { useNewsfeedPosts } from "../hooks/useNewsfeedPosts";
 
 // ── Mapped post type for UI ──────────────────────────────────────────
 const POST_TYPES = {
@@ -20,50 +21,9 @@ const POST_TYPES = {
 
 export function Newsfeed() {
   const { user, session } = useAuth();
-  const [newPost,   setNewPost]   = useState("");
-  const [posts,     setPosts]     = useState<FeedPost[]>([]);
-  const [loading,   setLoading]   = useState(true);
+  const [newPost, setNewPost] = useState("");
+  const { posts, loading, handleLike } = useNewsfeedPosts();
   const [reporting, setReporting] = useState<Record<string, boolean>>({});
-
-  useEffect(() => {
-    fetchPosts();
-  }, []);
-
-  const fetchPosts = async () => {
-    setLoading(true);
-    try {
-      const { data, error } = await supabase
-        .from("newsfeed_posts")
-        .select("id, author_name, author_role, author_avatar, post_type, content, likes_count, comments_count, created_at")
-        .order("created_at", { ascending: false });
-
-      if (error) throw error;
-      setPosts(data.map((row: any) => mapDbPost(row)));
-    } catch (err) {
-      console.error("Error fetching posts:", err);
-    } finally {
-      setLoading(false);
-    }
-  };
-
-    const channel = supabase
-      .channel("newsfeed-posts")
-      .on("postgres_changes", { event: "INSERT", schema: "public", table: "newsfeed_posts" }, (payload) => {
-        const mapped = mapDbPost(payload.new as DbFeedPost);
-        setPosts((prev) => (prev.some((p) => p.id === mapped.id) ? prev : [mapped, ...prev]));
-      })
-      .on("postgres_changes", { event: "UPDATE", schema: "public", table: "newsfeed_posts" }, (payload) => {
-        // Reflect removed/moderated posts
-        const updated = mapDbPost(payload.new as DbFeedPost);
-        setPosts((prev) => prev.map((p) => (p.id === updated.id ? updated : p)));
-      })
-      .subscribe();
-
-    return () => {
-      isMounted = false;
-      void supabase.removeChannel(channel);
-    };
-  }, []);
 
   const handlePost = () => {
     if (!newPost.trim()) return;
@@ -161,7 +121,7 @@ export function Newsfeed() {
                 <CardHeader>
                   <div className="flex items-start gap-3">
                     <Avatar className="h-10 w-10 bg-blue-600 text-white flex items-center justify-center rounded-full">
-                      {post.avatar || (post.author || "?").slice(0, 2).toUpperCase()}
+                      {post.avatar}
                     </Avatar>
                     <div className="flex-1">
                       <div className="flex items-center justify-between">
