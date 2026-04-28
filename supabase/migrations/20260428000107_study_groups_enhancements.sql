@@ -3,7 +3,7 @@
 -- ─────────────────────────────────────────────
 
 -- Add category and tags columns to study_groups
-ALTER TABLE study_groups
+ALTER TABLE if exists study_groups
 ADD COLUMN IF NOT EXISTS category text DEFAULT 'general',
 ADD COLUMN IF NOT EXISTS tags text[] DEFAULT '{}',
 ADD COLUMN IF NOT EXISTS is_archived boolean DEFAULT false;
@@ -15,12 +15,21 @@ CREATE INDEX IF NOT EXISTS idx_study_groups_member_count ON study_groups(member_
 CREATE INDEX IF NOT EXISTS idx_study_groups_created_at ON study_groups(created_at DESC);
 
 -- Add column to track group creation timestamp (if not already present)
-ALTER TABLE study_groups
+ALTER TABLE if exists study_groups
 ADD COLUMN IF NOT EXISTS updated_at timestamptz DEFAULT now();
 
--- Update study group members table to ensure relationship integrity
-ALTER TABLE study_group_members
-ADD COLUMN IF NOT EXISTS updated_at timestamptz DEFAULT now();
+-- Update study group members table to ensure relationship integrity (only if table exists)
+do $$
+begin
+  if exists (
+    select 1 from information_schema.tables
+    where table_schema = 'public'
+    and table_name = 'study_group_members'
+  ) then
+    alter table study_group_members
+    add column if not exists updated_at timestamptz default now();
+  end if;
+end$$;
 
 -- Trigger to update updated_at for study_groups
 CREATE OR REPLACE FUNCTION update_study_groups_timestamp()
@@ -37,9 +46,18 @@ CREATE TRIGGER update_study_groups_timestamp
   FOR EACH ROW
   EXECUTE FUNCTION update_study_groups_timestamp();
 
--- Trigger to update updated_at for study_group_members
-DROP TRIGGER IF EXISTS update_study_group_members_timestamp ON study_group_members;
-CREATE TRIGGER update_study_group_members_timestamp
-  BEFORE UPDATE ON study_group_members
-  FOR EACH ROW
-  EXECUTE FUNCTION public.set_updated_at();
+-- Trigger to update updated_at for study_group_members (only if table exists)
+do $$
+begin
+  if exists (
+    select 1 from information_schema.tables
+    where table_schema = 'public'
+    and table_name = 'study_group_members'
+  ) then
+    drop trigger if exists update_study_group_members_timestamp on study_group_members;
+    create trigger update_study_group_members_timestamp
+      before update on study_group_members
+      for each row
+      execute function public.set_updated_at();
+  end if;
+end$$;

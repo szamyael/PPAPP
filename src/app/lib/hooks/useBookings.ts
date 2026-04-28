@@ -51,7 +51,6 @@ function mapDbBookingToSession(s: any): UpcomingSession {
 async function fetchAllBookings(userId: string): Promise<Booking[]> {
   const isTutor = false; // Will be determined by the caller
   const fieldToMatch = "student_id";
-  const joinField = "tutor_id";
 
   const { data, error } = await supabase
     .from("bookings")
@@ -62,7 +61,7 @@ async function fetchAllBookings(userId: string): Promise<Booking[]> {
       start_time,
       hours,
       status,
-      other_party:profiles!bookings_${joinField}_fkey (
+      other_party:profiles!bookings_tutor_profile_fkey (
         full_name,
         avatar_url
       ),
@@ -109,7 +108,7 @@ async function fetchTutorBookings(userId: string): Promise<Booking[]> {
       start_time,
       hours,
       status,
-      other_party:profiles!bookings_student_id_fkey (
+      other_party:profiles!bookings_student_profile_fkey (
         full_name,
         avatar_url
       ),
@@ -153,7 +152,7 @@ async function fetchUpcomingSessions(userId: string): Promise<UpcomingSession[]>
       id,
       subject,
       start_time,
-      tutor:profiles!bookings_tutor_id_fkey (
+      tutor:profiles!bookings_tutor_profile_fkey (
         full_name
       )
     `)

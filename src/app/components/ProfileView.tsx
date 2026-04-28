@@ -74,7 +74,7 @@ export function ProfileView() {
             id,
             stars,
             comment,
-            student:profiles!ratings_rated_by_fkey (
+            student:profiles!ratings_rated_by_profile_fkey (
               full_name
             )
           )

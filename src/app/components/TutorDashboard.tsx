@@ -64,7 +64,7 @@ export function TutorDashboard() {
           subject,
           start_time,
           hours,
-          student:profiles!bookings_student_id_fkey (
+          student:profiles!bookings_student_profile_fkey (
             full_name
           )
         `)
@@ -117,7 +117,7 @@ export function TutorDashboard() {
           stars,
           comment,
           proof_url,
-          student:profiles!ratings_rated_by_fkey (
+          student:profiles!ratings_rated_by_profile_fkey (
             full_name
           )
         `)

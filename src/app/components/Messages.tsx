@@ -63,7 +63,7 @@ export function Messages() {
     setLoading(true);
     try {
       const isTutor = user.role === "tutor";
-      const joinField = isTutor ? "student_id" : "tutor_id";
+      const profileFkeyName = isTutor ? "bookings_student_profile_fkey" : "bookings_tutor_profile_fkey";
       const matchField = isTutor ? "tutor_id" : "student_id";
 
       // Fetch bookings as potential chats
@@ -72,7 +72,7 @@ export function Messages() {
         .select(`
           id,
           subject,
-          other_party:profiles!bookings_${joinField}_fkey (
+          other_party:profiles!${profileFkeyName} (
             id,
             full_name,
             avatar_url

@@ -35,7 +35,7 @@ async function fetchMaterials(): Promise<Material[]> {
       subject,
       download_count,
       file_url,
-      tutor:profiles!materials_tutor_id_fkey (
+      tutor:profiles!materials_tutor_profile_fkey (
         full_name
       ),
       organization:organizations (
