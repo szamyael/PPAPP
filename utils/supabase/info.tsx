@@ -9,7 +9,18 @@ export const supabaseUrl = import.meta.env.VITE_SUPABASE_URL;
 export const supabaseFunctionsBaseUrl = import.meta.env.VITE_SUPABASE_FUNCTIONS_BASE_URL;
 export const publicAnonKey = import.meta.env.VITE_SUPABASE_ANON_KEY;
 
-if (!projectId || !supabaseUrl || !publicAnonKey) {
+const isMissingEnv = (v: unknown) => {
+  if (typeof v !== "string") return true;
+  const t = v.trim();
+  return !t || t === "undefined" || t === "null";
+};
+
+if (
+  isMissingEnv(projectId) ||
+  isMissingEnv(supabaseUrl) ||
+  isMissingEnv(supabaseFunctionsBaseUrl) ||
+  isMissingEnv(publicAnonKey)
+) {
   throw new Error(
     `[Piyupair] Missing environment variables. ` +
     `Ensure VITE_SUPABASE_PROJECT_ID, VITE_SUPABASE_URL, VITE_SUPABASE_FUNCTIONS_BASE_URL, and VITE_SUPABASE_ANON_KEY are set.`

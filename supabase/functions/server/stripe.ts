@@ -1,17 +1,17 @@
 import Stripe from "npm:stripe@16.2.0";
 
 type CreateCheckoutSessionInput = {
-  amountCents:  unknown;
-  currency?:    unknown;
+  amountCents: unknown;
+  currency?: unknown;
   description?: unknown;
-  metadata?:    unknown;
-  origin?:      string;
+  metadata?: unknown;
+  origin?: string;
 };
 
 const getReturnBaseUrl = (origin?: string): string => {
   const configured = Deno.env.get("FRONTEND_URL");
   if (configured) return configured.replace(/\/$/, "");
-  if (origin)     return origin.replace(/\/$/, "");
+  if (origin) return origin.replace(/\/$/, "");
   return "http://localhost:5173";
 };
 
@@ -49,14 +49,16 @@ export async function createCheckoutSession(input: CreateCheckoutSessionInput) {
   if (!secretKey) throw new Error("Missing STRIPE_SECRET_KEY env var");
 
   const amountCents = parseAmountCents(input.amountCents);
-  const currency    = parseCurrency(input.currency);
+  const currency = parseCurrency(input.currency);
   const description = parseDescription(input.description);
-  const metadata    = parseMetadata(input.metadata);
+  const metadata = parseMetadata(input.metadata);
 
   // Metadata MUST include student_id, tutor_id, and booking fields
   // so the webhook can create the booking row without querying the frontend.
   if (metadata && !metadata.student_id) {
-    console.warn("createCheckoutSession: metadata missing student_id — webhook cannot fulfill booking");
+    console.warn(
+      "createCheckoutSession: metadata missing student_id — webhook cannot fulfill booking",
+    );
   }
 
   const stripe = new Stripe(secretKey, {
@@ -80,7 +82,7 @@ export async function createCheckoutSession(input: CreateCheckoutSessionInput) {
     ],
     // Pass session_id so the frontend can verify the booking was created
     success_url: `${baseUrl}/payment?checkout=success&session_id={CHECKOUT_SESSION_ID}`,
-    cancel_url:  `${baseUrl}/payment?checkout=cancelled`,
+    cancel_url: `${baseUrl}/payment?checkout=cancelled`,
     metadata,
   });
 
@@ -88,3 +90,4 @@ export async function createCheckoutSession(input: CreateCheckoutSessionInput) {
 
   return { url: session.url, id: session.id };
 }
+

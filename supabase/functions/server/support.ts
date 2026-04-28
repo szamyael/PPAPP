@@ -1,4 +1,4 @@
-import * as kv from "./kv_store.tsx";
+import * as kv from "./kv_store.ts";
 
 type SupportChatInput = {
   message: unknown;
@@ -68,3 +68,4 @@ export async function fileSupportTicket(input: SupportTicketInput) {
 
   return { id };
 }
+

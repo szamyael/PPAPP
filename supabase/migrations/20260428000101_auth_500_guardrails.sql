@@ -4,10 +4,22 @@
 -- - custom_access_token_hook throwing exceptions
 
 -- ─────────────────────────────────────────────
--- 1) Non-recursive admin check (SECURITY DEFINER)
+-- 1) Profiles policies: drop recursive/old admin policies
 -- ─────────────────────────────────────────────
+drop policy if exists "profiles_admin_all" on public.profiles;
+
+-- Admins can insert/update/delete any profile rows.
+-- (Select is already covered by "profiles_public_read" in this repo.)
+drop policy if exists "profiles_admin_insert" on public.profiles;
+drop policy if exists "profiles_admin_update" on public.profiles;
+drop policy if exists "profiles_admin_delete" on public.profiles;
+
+-- Now it is safe to drop/recreate the function those policies depend on.
 drop function if exists public.check_is_admin();
 
+-- ─────────────────────────────────────────────
+-- 2) Non-recursive admin check (SECURITY DEFINER)
+-- ─────────────────────────────────────────────
 create or replace function public.check_is_admin()
 returns boolean
 language plpgsql
@@ -24,17 +36,9 @@ end;
 $$;
 
 -- ─────────────────────────────────────────────
--- 2) Profiles policies: drop the recursive one, add safe admin policies
+-- 3) Recreate safe admin policies
 --    NOTE: keep existing owner/public read policies from earlier migrations.
 -- ─────────────────────────────────────────────
-drop policy if exists "profiles_admin_all" on public.profiles;
-
--- Admins can insert/update/delete any profile rows.
--- (Select is already covered by "profiles_public_read" in this repo.)
-drop policy if exists "profiles_admin_insert" on public.profiles;
-drop policy if exists "profiles_admin_update" on public.profiles;
-drop policy if exists "profiles_admin_delete" on public.profiles;
-
 create policy "profiles_admin_insert"
   on public.profiles
   for insert
@@ -52,7 +56,7 @@ create policy "profiles_admin_delete"
   using (public.check_is_admin());
 
 -- ─────────────────────────────────────────────
--- 3) JWT hook: never throw (return event unchanged on any error)
+-- 4) JWT hook: never throw (return event unchanged on any error)
 -- ─────────────────────────────────────────────
 create or replace function public.custom_access_token_hook(event jsonb)
 returns jsonb

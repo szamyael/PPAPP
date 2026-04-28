@@ -9,14 +9,14 @@ import { createClient } from "jsr:@supabase/supabase-js@2.49.8";
 
 interface FlagInput {
   content_type: "post" | "message" | "material" | "chat_message";
-  content_id:   string;
-  reason:       string;
+  content_id: string;
+  reason: string;
 }
 
 interface ReviewInput {
   flag_id: string;
-  action:  "approved" | "removed" | "warned";
-  notes?:  string;
+  action: "approved" | "removed" | "warned";
+  notes?: string;
 }
 
 // ─────────────────────────────────────────────
@@ -70,7 +70,7 @@ export async function flagContent(req: Request): Promise<Response> {
   if (!content_type || !content_id || !reason) {
     return new Response(
       JSON.stringify({ error: "content_type, content_id and reason are required" }),
-      { status: 400 }
+      { status: 400 },
     );
   }
 
@@ -116,7 +116,7 @@ export async function reviewContent(req: Request): Promise<Response> {
   if (!flag_id || !action) {
     return new Response(
       JSON.stringify({ error: "flag_id and action are required" }),
-      { status: 400 }
+      { status: 400 },
     );
   }
 
@@ -153,7 +153,7 @@ export async function reviewContent(req: Request): Promise<Response> {
   // Log the action
   await supabase.from("moderation_log").insert({
     content_type: flag.content_type,
-    content_id:   flag.content_id,
+    content_id: flag.content_id,
     action,
     flag_id,
     notes: notes ?? null,
@@ -161,3 +161,4 @@ export async function reviewContent(req: Request): Promise<Response> {
 
   return new Response(JSON.stringify({ success: true, action }), { status: 200 });
 }
+

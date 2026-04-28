@@ -1,10 +1,10 @@
 import { Hono } from "npm:hono";
 import { cors } from "npm:hono/cors";
 import { logger } from "npm:hono/logger";
-import { createCheckoutSession } from "./stripe.tsx";
-import { createBotReply, fileSupportTicket } from "./support.tsx";
-import { handleStripeWebhook } from "./webhook.tsx";
-import { flagContent, reviewContent } from "./moderation.tsx";
+import { createCheckoutSession } from "./stripe.ts";
+import { createBotReply, fileSupportTicket } from "./support.ts";
+import { handleStripeWebhook } from "./webhook.ts";
+import { flagContent, reviewContent } from "./moderation.ts";
 
 const app = new Hono();
 
@@ -37,11 +37,11 @@ app.post("/make-server-45108270/stripe/create-checkout-session", async (c) => {
   try {
     const body = await c.req.json();
     const result = await createCheckoutSession({
-      amountCents:  body?.amountCents,
-      currency:     body?.currency,
-      description:  body?.description,
-      metadata:     body?.metadata,
-      origin:       c.req.header("origin") ?? undefined,
+      amountCents: body?.amountCents,
+      currency: body?.currency,
+      description: body?.description,
+      metadata: body?.metadata,
+      origin: c.req.header("origin") ?? undefined,
     });
     return c.json(result);
   } catch (err) {
@@ -87,10 +87,10 @@ app.post("/make-server-45108270/support/ticket", async (c) => {
   try {
     const body = await c.req.json();
     const result = await fileSupportTicket({
-      email:   body?.email,
+      email: body?.email,
       subject: body?.subject,
       message: body?.message,
-      path:    body?.path,
+      path: body?.path,
     });
     return c.json(result);
   } catch (err) {
@@ -100,3 +100,4 @@ app.post("/make-server-45108270/support/ticket", async (c) => {
 });
 
 Deno.serve(app.fetch);
+

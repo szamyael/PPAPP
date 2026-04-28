@@ -60,8 +60,8 @@ export async function handleStripeWebhook(req: Request): Promise<Response> {
 // ─────────────────────────────────────────────
 async function fulfillCheckout(session: Stripe.Checkout.Session): Promise<void> {
   const supabaseUrl = Deno.env.get("SUPABASE_URL")!;
-  const serviceKey  = Deno.env.get("SUPABASE_SERVICE_ROLE_KEY")!;
-  const supabase    = createClient(supabaseUrl, serviceKey);
+  const serviceKey = Deno.env.get("SUPABASE_SERVICE_ROLE_KEY")!;
+  const supabase = createClient(supabaseUrl, serviceKey);
 
   const meta = session.metadata ?? {};
   const {
@@ -77,7 +77,10 @@ async function fulfillCheckout(session: Stripe.Checkout.Session): Promise<void> 
   } = meta;
 
   if (!student_id || !tutor_id) {
-    console.error("Webhook fulfillment: missing student_id or tutor_id in metadata", meta);
+    console.error(
+      "Webhook fulfillment: missing student_id or tutor_id in metadata",
+      meta,
+    );
     return;
   }
 
@@ -100,10 +103,10 @@ async function fulfillCheckout(session: Stripe.Checkout.Session): Promise<void> 
     student_id,
     tutor_id,
     subject: subject ?? "Tutoring",
-    topic:   topic ?? null,
-    date:    date ?? new Date().toISOString().split("T")[0],
+    topic: topic ?? null,
+    date: date ?? new Date().toISOString().split("T")[0],
     start_time: start_time ?? "09:00",
-    hours:       parseInt(hours ?? "1", 10),
+    hours: parseInt(hours ?? "1", 10),
     hourly_rate: parseFloat(hourly_rate ?? "0"),
     total_amount: parseFloat(total_amount ?? String(totalAmount)),
     status: "confirmed",
@@ -114,12 +117,16 @@ async function fulfillCheckout(session: Stripe.Checkout.Session): Promise<void> 
     console.error("Webhook: booking insert failed:", error.message);
     // Do not throw — return 200 to Stripe so it doesn't retry endlessly
     // Log for manual reconciliation
-    await supabase.from("fulfillment_errors").insert({
-      stripe_session_id: session.id,
-      error_message:     error.message,
-      raw_metadata:      meta,
-    }).then(() => {});
+    await supabase
+      .from("fulfillment_errors")
+      .insert({
+        stripe_session_id: session.id,
+        error_message: error.message,
+        raw_metadata: meta,
+      })
+      .then(() => {});
   } else {
     console.log("Webhook: booking confirmed for session", session.id);
   }
 }
+
