@@ -1,4 +1,4 @@
-import { useEffect, useState } from "react";
+import { useState, useMemo } from "react";
 import { Navigation } from "./Navigation";
 import { Input } from "./ui/input";
 import { Card, CardContent, CardDescription, CardHeader, CardTitle } from "./ui/card";
@@ -7,126 +7,66 @@ import { Badge } from "./ui/badge";
 import { Button } from "./ui/button";
 import { BookOpen, Download, Search, Star, Loader2 } from "lucide-react";
 import { supabase } from "../lib/supabaseClient";
-
-interface Material {
-  id: string;
-  title: string;
-  subject: string;
-  organization_name: string;
-  tutor_name: string;
-  downloads: number;
-  rating: number;
-  file_url: string;
-}
-
-const mockMaterials = [
-  {
-    id: "1",
-    title: "Calculus I - Complete Notes",
-    subject: "Mathematics",
-    organization: "Excellence Tutoring Center",
-    tutor: "Dr. Michael Johnson",
-    downloads: 234,
-    rating: 4.9,
-    type: "PDF",
-  },
-  {
-    id: "2",
-    title: "Physics Lab Manual",
-    subject: "Physics",
-    organization: "Academic Success Institute",
-    tutor: "Sarah Williams",
-    downloads: 189,
-    rating: 4.8,
-    type: "PDF",
-  },
-  {
-    id: "3",
-    title: "Python Programming Guide",
-    subject: "Computer Science",
-    organization: "Tech Academy",
-    tutor: "James Chen",
-    downloads: 412,
-    rating: 5.0,
-    type: "PDF",
-  },
-  {
-    id: "4",
-    title: "Chemistry Cheat Sheet",
-    subject: "Chemistry",
-    organization: "Excellence Tutoring Center",
-    tutor: "Dr. Emily Davis",
-    downloads: 301,
-    rating: 4.7,
-    type: "PDF",
-  },
-];
+import { useMaterials } from "../lib/hooks";
 
 export function OpenLibrary() {
   const [searchTerm, setSearchTerm] = useState("");
   const [subjectFilter, setSubjectFilter] = useState("all");
-  const [materials, setMaterials] = useState<Material[]>([]);
-  const [loading, setLoading] = useState(true);
+  const { data: materials, isLoading, error } = useMaterials();
 
-  useEffect(() => {
-    fetchMaterials();
-  }, []);
-
-  const fetchMaterials = async () => {
-    setLoading(true);
-    try {
-      const { data, error } = await supabase
-        .from("materials")
-        .select(`
-          id,
-          title,
-          subject,
-          download_count,
-          file_url,
-          tutor:profiles!materials_tutor_id_fkey (
-            full_name
-          ),
-          organization:organizations (
-            name
-          )
-        `)
-        .eq("is_open_library", true)
-        .eq("approval_status", "approved")
-        .order("created_at", { ascending: false });
-
-      if (error) throw error;
-
-      const mapped: Material[] = (data || []).map((m: any) => ({
-        id: m.id,
-        title: m.title,
-        subject: m.subject || "General",
-        organization_name: m.organization?.name || "Independent",
-        tutor_name: m.tutor?.full_name || "Unknown",
-        downloads: m.download_count || 0,
-        rating: 4.8, // Default rating if no system exists yet
-        file_url: m.file_url,
-      }));
-
-      setMaterials(mapped);
-    } catch (err) {
-      console.error("Error fetching materials:", err);
-    } finally {
-      setLoading(false);
-    }
-  };
-
-  const filteredMaterials = materials.filter((material) => {
-    const matchesSearch =
-      material.title.toLowerCase().includes(searchTerm.toLowerCase()) ||
-      material.subject.toLowerCase().includes(searchTerm.toLowerCase());
-    const matchesSubject = subjectFilter === "all" || material.subject === subjectFilter;
-    return matchesSearch && matchesSubject;
-  });
+  const filteredMaterials = useMemo(() => {
+    if (!materials) return [];
+    
+    return materials.filter((material) => {
+      const matchesSearch =
+        material.title.toLowerCase().includes(searchTerm.toLowerCase()) ||
+        material.subject.toLowerCase().includes(searchTerm.toLowerCase());
+      const matchesSubject = subjectFilter === "all" || material.subject === subjectFilter;
+      return matchesSearch && matchesSubject;
+    });
+  }, [materials, searchTerm, subjectFilter]);
 
   const handleDownload = async (materialId: string, url: string) => {
     window.open(url, "_blank");
     await supabase.rpc("increment_material_downloads", { p_material_id: materialId });
   };
+
+  if (isLoading) {
+    return (
+      <div className="min-h-screen bg-gray-50">
+        <Navigation />
+        <div className="max-w-7xl mx-auto px-4 py-8">
+          <div className="mb-8">
+            <h1 className="text-3xl font-bold text-gray-900">Open Library</h1>
+            <p className="text-gray-600 mt-1">
+              Access learning materials shared by organizations
+            </p>
+          </div>
+          <div className="flex justify-center py-12">
+            <Loader2 className="animate-spin text-blue-600" />
+          </div>
+        </div>
+      </div>
+    );
+  }
+
+  if (error) {
+    return (
+      <div className="min-h-screen bg-gray-50">
+        <Navigation />
+        <div className="max-w-7xl mx-auto px-4 py-8">
+          <div className="mb-8">
+            <h1 className="text-3xl font-bold text-gray-900">Open Library</h1>
+          </div>
+          <Card>
+            <CardContent className="py-12 text-center">
+              <p className="text-red-600">Error loading materials. Please try again later.</p>
+            </CardContent>
+          </Card>
+        </div>
+      </div>
+    );
+  }
 
   return (
     <div className="min-h-screen bg-gray-50">
@@ -169,8 +109,12 @@ export function OpenLibrary() {
         </Card>
 
         {/* Materials Grid */}
-        {loading ? (
-          <div className="flex justify-center py-12"><Loader2 className="animate-spin text-blue-600" /></div>
+        {filteredMaterials.length === 0 ? (
+          <Card>
+            <CardContent className="py-12 text-center">
+              <p className="text-gray-600">No materials found.</p>
+            </CardContent>
+          </Card>
         ) : (
           <div className="grid md:grid-cols-2 lg:grid-cols-3 gap-6">
             {filteredMaterials.map((material) => (
@@ -209,14 +153,6 @@ export function OpenLibrary() {
               </Card>
             ))}
           </div>
-        )}
-
-        {filteredMaterials.length === 0 && (
-          <Card>
-            <CardContent className="py-12 text-center">
-              <p className="text-gray-600">No materials found.</p>
-            </CardContent>
-          </Card>
         )}
       </div>
     </div>

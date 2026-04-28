@@ -1,4 +1,4 @@
-import { useEffect, useMemo, useState } from "react";
+import { useMemo } from "react";
 import { useNavigate } from "react-router";
 import { Navigation } from "./Navigation";
 import { Card, CardContent, CardDescription, CardHeader, CardTitle } from "./ui/card";
@@ -7,88 +7,60 @@ import { Button } from "./ui/button";
 import { Tabs, TabsContent, TabsList, TabsTrigger } from "./ui/tabs";
 import { Calendar, Clock, Star, MessageCircle, Video, Loader2 } from "lucide-react";
 import { useAuth } from "../contexts/AuthContext";
+import { useStudentBookings, useTutorBookings, useBookingsSubscription } from "../lib/hooks";
+import { useEffect } from "react";
 import { supabase } from "../lib/supabaseClient";
-
-interface Session {
-  id: string;
-  other_party_name: string;
-  subject: string;
-  topic: string;
-  date: string;
-  time: string;
-  duration: string;
-  status: string;
-  rated: boolean;
-}
 
 export function MySessions() {
   const navigate = useNavigate();
   const { user } = useAuth();
-  const [sessions, setSessions] = useState<Session[]>([]);
-  const [loading, setLoading] = useState(true);
 
+  // Use React Query hooks based on user role
+  const { data: studentBookings, isLoading: studentLoading } = useStudentBookings(user?.id);
+  const { data: tutorBookings, isLoading: tutorLoading } = useTutorBookings(user?.id);
+
+  // Set up real-time subscription for bookings updates
   useEffect(() => {
-    if (user) {
-      fetchSessions();
-    }
-  }, [user]);
+    const subscription = useBookingsSubscription(user?.id);
+    return () => {
+      supabase.removeChannel(subscription);
+    };
+  }, [user?.id]);
 
-  const fetchSessions = async () => {
-    setLoading(true);
-    try {
-      const isTutor = user?.role === "tutor";
-      const fieldToMatch = isTutor ? "tutor_id" : "student_id";
-      const joinField = isTutor ? "student_id" : "tutor_id";
+  // Select the appropriate bookings based on user role
+  const sessions = useMemo(() => {
+    if (user?.role === "tutor") return tutorBookings;
+    return studentBookings;
+  }, [user?.role, studentBookings, tutorBookings]);
 
-      const { data, error } = await supabase
-        .from("bookings")
-        .select(`
-          id,
-          subject,
-          topic,
-          start_time,
-          end_time,
-          status,
-          other_party:profiles!bookings_${joinField}_fkey (
-            full_name
-          ),
-          ratings (
-            id
-          )
-        `)
-        .eq(fieldToMatch, user?.id)
-        .order("start_time", { ascending: false });
+  const isLoading = user?.role === "tutor" ? tutorLoading : studentLoading;
 
-      if (error) throw error;
+  const upcomingSessions = useMemo(() => {
+    if (!sessions) return [];
+    return sessions.filter(s => s.status === "confirmed" || s.status === "pending");
+  }, [sessions]);
 
-      const mapped: Session[] = (data || []).map((s: any) => {
-        const start = new Date(s.start_time);
-        const end = new Date(s.end_time);
-        const durationHours = (end.getTime() - start.getTime()) / (1000 * 60 * 60);
+  const pastSessions = useMemo(() => {
+    if (!sessions) return [];
+    return sessions.filter(s => s.status === "completed");
+  }, [sessions]);
 
-        return {
-          id: s.id,
-          other_party_name: s.other_party?.full_name || "Unknown",
-          subject: s.subject,
-          topic: s.topic,
-          date: start.toLocaleDateString("en-US", { month: "short", day: "numeric", year: "numeric" }),
-          time: start.toLocaleTimeString("en-US", { hour: "numeric", minute: "2-digit" }),
-          duration: `${durationHours} hour${durationHours !== 1 ? "s" : ""}`,
-          status: s.status,
-          rated: (s.ratings || []).length > 0,
-        };
-      });
-
-      setSessions(mapped);
-    } catch (error) {
-      console.error("Error fetching sessions:", error);
-    } finally {
-      setLoading(false);
-    }
-  };
-
-  const upcomingSessions = sessions.filter(s => s.status === "confirmed" || s.status === "pending");
-  const pastSessions = sessions.filter(s => s.status === "completed");
+  if (isLoading) {
+    return (
+      <div className="min-h-screen bg-gray-50">
+        <Navigation />
+        <div className="max-w-7xl mx-auto px-4 py-8">
+          <div className="mb-8">
+            <h1 className="text-3xl font-bold text-gray-900">My Sessions</h1>
+            <p className="text-gray-600 mt-1">Manage your tutoring sessions</p>
+          </div>
+          <div className="flex justify-center py-24">
+            <Loader2 className="h-12 w-12 animate-spin text-blue-600" />
+          </div>
+        </div>
+      </div>
+    );
+  }
 
   return (
     <div className="min-h-screen bg-gray-50">
@@ -99,10 +71,12 @@ export function MySessions() {
           <p className="text-gray-600 mt-1">Manage your tutoring sessions</p>
         </div>
 
-        {loading ? (
-          <div className="flex justify-center py-24">
-            <Loader2 className="h-12 w-12 animate-spin text-blue-600" />
-          </div>
+        {!sessions || sessions.length === 0 ? (
+          <Card>
+            <CardContent className="py-12 text-center text-gray-500">
+              No sessions found.
+            </CardContent>
+          </Card>
         ) : (
           <Tabs defaultValue="upcoming">
             <TabsList>

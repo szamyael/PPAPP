@@ -1,4 +1,4 @@
-import { useEffect, useState } from "react";
+import { useEffect, useState, useMemo } from "react";
 import { useNavigate } from "react-router";
 import { Navigation } from "./Navigation";
 import { Button } from "./ui/button";
@@ -10,6 +10,12 @@ import { toast } from "sonner";
 import { supabase } from "../lib/supabaseClient";
 import { useAuth } from "../contexts/AuthContext";
 import { publicAnonKey, supabaseFunctionsBaseUrl } from "../../../utils/supabase/info";
+import { 
+  useNewsfeedPosts, 
+  useNewsfeedSubscription, 
+  useUserConnections 
+} from "../lib/hooks";
+import type { NewsfeedPost } from "../lib/hooks/useNewsfeedPosts";
 
 // ── Mapped post type for UI ──────────────────────────────────────────
 const POST_TYPES = {
@@ -19,125 +25,32 @@ const POST_TYPES = {
   material:     { icon: <BookOpen      className="h-5 w-5 text-green-600" />,  label: "Material" },
 };
 
-interface DbFeedPost {
-  id: string;
-  author_id: string;
-  author_name: string;
-  author_role: string;
-  author_avatar: string;
-  post_type: string;
-  content: string;
-  likes_count: number;
-  comments_count: number;
-  created_at: string;
-}
-
-interface FeedPost extends DbFeedPost {
-  timeAgo: string;
-}
-
-function mapDbPost(row: DbFeedPost): FeedPost {
-  const now = new Date();
-  const created = new Date(row.created_at);
-  const diffMs = now.getTime() - created.getTime();
-  const diffMins = Math.floor(diffMs / 60000);
-
-  let timeAgo = "just now";
-  if (diffMins < 60) timeAgo = `${diffMins}m ago`;
-  else if (diffMins < 1440) timeAgo = `${Math.floor(diffMins / 60)}h ago`;
-  else timeAgo = `${Math.floor(diffMins / 1440)}d ago`;
-
-  return { ...row, timeAgo };
-}
-
 export function Newsfeed() {
   const { user, session } = useAuth();
   const navigate = useNavigate();
-  const [newPost,   setNewPost]   = useState("");
-  const [posts,     setPosts]     = useState<FeedPost[]>([]);
-  const [loading,   setLoading]   = useState(true);
+  const [newPost, setNewPost] = useState("");
   const [reporting, setReporting] = useState<Record<string, boolean>>({});
-  const [following, setFollowing] = useState<Set<string>>(new Set());
+  
+  // Use React Query hooks
+  const { data: posts, isLoading: postsLoading } = useNewsfeedPosts();
+  const { data: following, isLoading: followingLoading } = useUserConnections(user?.id);
 
+  // Set up real-time subscription
   useEffect(() => {
-    fetchPosts();
-    if (user?.id) fetchFollowing();
-  }, [user?.id]);
-
-  const fetchPosts = async () => {
-    setLoading(true);
-    try {
-      const { data, error } = await supabase
-        .from("newsfeed_posts")
-        .select("id, author_id, author_name, author_role, author_avatar, post_type, content, likes_count, comments_count, created_at")
-        .order("created_at", { ascending: false });
-
-      if (error) throw error;
-      setPosts(data.map((row: any) => mapDbPost(row)));
-    } catch (err) {
-      console.error("Error fetching posts:", err);
-    } finally {
-      setLoading(false);
-    }
-  };
-
-  useEffect(() => {
-    let isMounted = true;
-
-    const channel = supabase
-      .channel("newsfeed-posts")
-      .on("postgres_changes", { event: "INSERT", schema: "public", table: "newsfeed_posts" }, (payload) => {
-        const mapped = mapDbPost(payload.new as DbFeedPost);
-        setPosts((prev) => (prev.some((p) => p.id === mapped.id) ? prev : [mapped, ...prev]));
-      })
-      .on("postgres_changes", { event: "UPDATE", schema: "public", table: "newsfeed_posts" }, (payload) => {
-        // Reflect removed/moderated posts
-        const updated = mapDbPost(payload.new as DbFeedPost);
-        setPosts((prev) => prev.map((p) => (p.id === updated.id ? updated : p)));
-      })
-      .subscribe();
-
+    const subscription = useNewsfeedSubscription();
     return () => {
-      isMounted = false;
-      void supabase.removeChannel(channel);
+      supabase.removeChannel(subscription);
     };
   }, []);
 
-  const handlePost = () => {
-    if (!newPost.trim()) return;
+  const isLoading = postsLoading || followingLoading;
 
-    const content = newPost.trim();
-    void supabase
-      .from("newsfeed_posts")
-      .insert({
-        author_name:   user?.name         ?? "Anonymous",
-        author_role:   user?.role         ?? "student",
-        author_avatar: (user?.name ?? "?").slice(0, 2).toUpperCase(),
-        post_type:     "question",
-        content,
-      })
-      .then(({ error }) => {
-        if (error) { toast.error("Unable to publish post right now"); return; }
-        toast.success("Post shared successfully!");
-        setNewPost("");
-      });
+  const handleMessage = (authorId: string) => {
+    navigate(`/messages?user_id=${authorId}`);
   };
 
-  const fetchFollowing = async () => {
-    if (!user?.id) return;
-    try {
-      const { data, error } = await supabase
-        .from("user_connections")
-        .select("following_id")
-        .eq("follower_id", user.id)
-        .eq("status", "accepted");
-
-      if (error) throw error;
-      const followingSet = new Set((data || []).map((c: any) => c.following_id));
-      setFollowing(followingSet);
-    } catch (error) {
-      console.error("Error fetching following:", error);
-    }
+  const handleViewProfile = (authorId: string) => {
+    navigate(`/profile/${authorId}`);
   };
 
   const handleFollow = async (authorId: string) => {
@@ -147,7 +60,7 @@ export function Newsfeed() {
     }
 
     try {
-      const isFollowing = following.has(authorId);
+      const isFollowing = following?.has(authorId);
 
       if (isFollowing) {
         await supabase
@@ -155,33 +68,20 @@ export function Newsfeed() {
           .delete()
           .eq("follower_id", user.id)
           .eq("following_id", authorId);
-
-        setFollowing((prev) => {
-          const newSet = new Set(prev);
-          newSet.delete(authorId);
-          return newSet;
-        });
       } else {
         await supabase.from("user_connections").insert({
           follower_id: user.id,
           following_id: authorId,
           status: "accepted",
         });
-
-        setFollowing((prev) => new Set(prev).add(authorId));
       }
+
+      // Optimistic update - invalidate to refetch
+      toast.success(isFollowing ? "Unfollowed user" : "Following user");
     } catch (error) {
       console.error("Error updating follow:", error);
       toast.error("Failed to update follow status");
     }
-  };
-
-  const handleMessage = (authorId: string) => {
-    navigate(`/messages?user_id=${authorId}`);
-  };
-
-  const handleViewProfile = (authorId: string) => {
-    navigate(`/profile/${authorId}`);
   };
 
   // ── Report a post ────────────────────────────────────────────────────
@@ -220,6 +120,43 @@ export function Newsfeed() {
     }
   };
 
+  const handlePost = () => {
+    if (!newPost.trim()) return;
+
+    const content = newPost.trim();
+    void supabase
+      .from("newsfeed_posts")
+      .insert({
+        author_name:   user?.name         ?? "Anonymous",
+        author_role:   user?.role         ?? "student",
+        author_avatar: (user?.name ?? "?").slice(0, 2).toUpperCase(),
+        post_type:     "question",
+        content,
+      })
+      .then(({ error }) => {
+        if (error) { toast.error("Unable to publish post right now"); return; }
+        toast.success("Post shared successfully!");
+        setNewPost("");
+      });
+  };
+
+  if (isLoading) {
+    return (
+      <div className="min-h-screen bg-gray-50">
+        <Navigation />
+        <div className="max-w-3xl mx-auto px-4 py-8">
+          <div className="mb-8">
+            <h1 className="text-3xl font-bold text-gray-900">Newsfeed</h1>
+            <p className="text-gray-600 mt-1">Stay updated with the latest from your community</p>
+          </div>
+          <div className="flex justify-center py-12">
+            <Loader2 className="animate-spin text-blue-600" />
+          </div>
+        </div>
+      </div>
+    );
+  }
+
   return (
     <div className="min-h-screen bg-gray-50">
       <Navigation />
@@ -249,13 +186,11 @@ export function Newsfeed() {
         </Card>
 
         {/* Posts */}
-        {loading ? (
-          <div className="flex justify-center py-12"><Loader2 className="animate-spin text-blue-600" /></div>
-        ) : posts.length === 0 ? (
+        {!posts || posts.length === 0 ? (
           <Card className="py-12 text-center text-gray-500">No posts yet. Be the first to share something!</Card>
         ) : (
           <div className="space-y-4">
-            {posts.map((post) => (
+            {posts.map((post: NewsfeedPost) => (
               <Card key={post.id}>
                 <CardHeader>
                   <div className="flex items-start gap-3">
@@ -283,7 +218,7 @@ export function Newsfeed() {
                             className="h-7 px-2 text-xs"
                             onClick={() => handleFollow(post.author_id)}
                           >
-                            {following.has(post.author_id) ? "✓ Following" : "Follow"}
+                            {following?.has(post.author_id) ? "✓ Following" : "Follow"}
                           </Button>
                           <Button
                             size="sm"
@@ -317,7 +252,7 @@ export function Newsfeed() {
                       <span className="text-sm">Share</span>
                     </button>
                     {/* Report button — only shown to signed-in non-admin users */}
-                    {user && user.id !== post.id && ( // Don't report yourself
+                    {user && user.id !== post.author_id && ( // Don't report yourself
                       <button
                         className="ml-auto flex items-center gap-1 text-xs text-gray-400 hover:text-red-500 transition-colors disabled:opacity-40"
                         onClick={() => handleReport(post.id)}
