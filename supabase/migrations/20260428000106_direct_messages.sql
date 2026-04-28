@@ -55,7 +55,7 @@ CREATE POLICY "users_can_update_messages"
 CREATE TRIGGER update_direct_messages_timestamp
   BEFORE UPDATE ON direct_messages
   FOR EACH ROW
-  EXECUTE FUNCTION update_timestamp();
+  EXECUTE FUNCTION public.set_updated_at();
 
 -- Realtime
 ALTER PUBLICATION supabase_realtime ADD TABLE direct_messages;

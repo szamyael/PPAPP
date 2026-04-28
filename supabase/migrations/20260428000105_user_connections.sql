@@ -50,4 +50,4 @@ CREATE POLICY "users_can_delete_own_connections"
 CREATE TRIGGER update_user_connections_timestamp
   BEFORE UPDATE ON user_connections
   FOR EACH ROW
-  EXECUTE FUNCTION update_timestamp();
+  EXECUTE FUNCTION public.set_updated_at();

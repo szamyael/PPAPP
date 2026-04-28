@@ -42,4 +42,4 @@ DROP TRIGGER IF EXISTS update_study_group_members_timestamp ON study_group_membe
 CREATE TRIGGER update_study_group_members_timestamp
   BEFORE UPDATE ON study_group_members
   FOR EACH ROW
-  EXECUTE FUNCTION update_timestamp();
+  EXECUTE FUNCTION public.set_updated_at();

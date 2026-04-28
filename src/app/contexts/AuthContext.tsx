@@ -132,17 +132,30 @@ export const AuthProvider: React.FC<{ children: React.ReactNode }> = ({
   useEffect(() => {
     let mounted = true;
 
-    const init = async () => {
-      const { data: { session: existingSession } } =
-        await supabase.auth.getSession();
-
-      if (existingSession && mounted) {
-        setSession(existingSession);
-        const appUser = await loadProfile(existingSession);
-        if (mounted) setUser(appUser);
+    // Timeout to prevent indefinite loading state
+    const timeoutId = setTimeout(() => {
+      if (mounted) {
+        console.warn('Auth initialization timed out, continuing without session');
+        setLoading(false);
       }
+    }, 10000); // 10 second timeout
 
-      if (mounted) setLoading(false);
+    const init = async () => {
+      try {
+        const { data: { session: existingSession } } =
+          await supabase.auth.getSession();
+
+        if (existingSession && mounted) {
+          setSession(existingSession);
+          const appUser = await loadProfile(existingSession);
+          if (mounted) setUser(appUser);
+        }
+      } catch (error) {
+        console.error('Auth initialization error:', error);
+      } finally {
+        clearTimeout(timeoutId);
+        if (mounted) setLoading(false);
+      }
     };
 
     init();
@@ -151,12 +164,16 @@ export const AuthProvider: React.FC<{ children: React.ReactNode }> = ({
     const { data: { subscription } } = supabase.auth.onAuthStateChange(
       async (_event, newSession) => {
         if (!mounted) return;
-        setSession(newSession);
-        if (newSession) {
-          const appUser = await loadProfile(newSession);
-          setUser(appUser);
-        } else {
-          setUser(null);
+        try {
+          setSession(newSession);
+          if (newSession) {
+            const appUser = await loadProfile(newSession);
+            setUser(appUser);
+          } else {
+            setUser(null);
+          }
+        } catch (error) {
+          console.error('Auth state change error:', error);
         }
       }
     );
