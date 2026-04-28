@@ -10,79 +10,41 @@ import { supabase } from "../lib/supabaseClient";
 import { useAuth } from "../contexts/AuthContext";
 import { publicAnonKey, supabaseFunctionsBaseUrl } from "../../../utils/supabase/info";
 
-type FeedPost = {
-  id: string;
-  author: string;
-  role: string;
-  avatar: string;
-  time: string;
-  content: string;
-  type: string;
-  likes: number;
-  comments: number;
+// ── Mapped post type for UI ──────────────────────────────────────────
+const POST_TYPES = {
+  question:     { icon: <MessageCircle className="h-5 w-5 text-blue-600" />,   label: "Question" },
+  announcement: { icon: <Bell          className="h-5 w-5 text-amber-600" />,  label: "Announcement" },
+  event:        { icon: <Calendar      className="h-5 w-5 text-purple-600" />, label: "Event" },
+  material:     { icon: <BookOpen      className="h-5 w-5 text-green-600" />,  label: "Material" },
 };
-
-type DbFeedPost = {
-  id: string;
-  author_name: string;
-  author_role: string;
-  author_avatar: string;
-  post_type: string;
-  content: string;
-  likes_count: number;
-  comments_count: number;
-  created_at: string;
-};
-
-function toRelativeTime(createdAt: string): string {
-  const created = new Date(createdAt).getTime();
-  const diffMinutes = Math.max(0, Math.floor((Date.now() - created) / 60000));
-  if (diffMinutes < 1)  return "Just now";
-  if (diffMinutes < 60) return `${diffMinutes} minute${diffMinutes === 1 ? "" : "s"} ago`;
-  const diffHours = Math.floor(diffMinutes / 60);
-  if (diffHours < 24)   return `${diffHours} hour${diffHours === 1 ? "" : "s"} ago`;
-  const diffDays = Math.floor(diffHours / 24);
-  return `${diffDays} day${diffDays === 1 ? "" : "s"} ago`;
-}
-
-function mapDbPost(row: DbFeedPost): FeedPost {
-  return {
-    id:       row.id,
-    author:   row.author_name,
-    role:     row.author_role,
-    avatar:   row.author_avatar,
-    time:     toRelativeTime(row.created_at),
-    content:  row.content,
-    type:     row.post_type,
-    likes:    row.likes_count,
-    comments: row.comments_count,
-  };
-}
-
-const mockPosts: FeedPost[] = [
-  { id: "1", author: "Dr. Michael Johnson", role: "Tutor",        avatar: "MJ", time: "2 hours ago", content: "📚 New webinar this Friday: 'Mastering Calculus - Tips and Tricks'! Free for all students. Register in the comments!", type: "event",        likes: 24, comments: 8  },
-  { id: "2", author: "Sarah Williams",      role: "Student",      avatar: "SW", time: "5 hours ago", content: "Can anyone recommend resources for learning quantum physics? Need help with the basics! 🔬",                            type: "question",     likes: 12, comments: 15 },
-  { id: "3", author: "Excellence Tutoring", role: "Organization", avatar: "ET", time: "1 day ago",   content: "🎉 We're excited to announce our new Chemistry Lab series starting next month!",                                     type: "announcement", likes: 45, comments: 6  },
-  { id: "4", author: "James Chen",          role: "Tutor",        avatar: "JC", time: "1 day ago",   content: "Just uploaded new programming materials to the Open Library! Check out 'Python for Beginners'. 💻",                  type: "material",     likes: 38, comments: 12 },
-];
 
 export function Newsfeed() {
   const { user, session } = useAuth();
   const [newPost,   setNewPost]   = useState("");
-  const [posts,     setPosts]     = useState<FeedPost[]>(mockPosts);
+  const [posts,     setPosts]     = useState<FeedPost[]>([]);
+  const [loading,   setLoading]   = useState(true);
   const [reporting, setReporting] = useState<Record<string, boolean>>({});
 
   useEffect(() => {
-    let isMounted = true;
+    fetchPosts();
+  }, []);
 
-    void supabase
-      .from("newsfeed_posts")
-      .select("id, author_name, author_role, author_avatar, post_type, content, likes_count, comments_count, created_at")
-      .order("created_at", { ascending: false })
-      .then(({ data, error }) => {
-        if (error || !data || !isMounted) return;
-        setPosts(data.map((row: unknown) => mapDbPost(row as DbFeedPost)));
-      });
+  const fetchPosts = async () => {
+    setLoading(true);
+    try {
+      const { data, error } = await supabase
+        .from("newsfeed_posts")
+        .select("id, author_name, author_role, author_avatar, post_type, content, likes_count, comments_count, created_at")
+        .order("created_at", { ascending: false });
+
+      if (error) throw error;
+      setPosts(data.map((row: any) => mapDbPost(row)));
+    } catch (err) {
+      console.error("Error fetching posts:", err);
+    } finally {
+      setLoading(false);
+    }
+  };
 
     const channel = supabase
       .channel("newsfeed-posts")
@@ -188,62 +150,70 @@ export function Newsfeed() {
         </Card>
 
         {/* Posts */}
-        <div className="space-y-4">
-          {posts.map((post) => (
-            <Card key={post.id}>
-              <CardHeader>
-                <div className="flex items-start gap-3">
-                  <Avatar className="h-10 w-10 bg-blue-600 text-white flex items-center justify-center rounded-full">
-                    {post.avatar}
-                  </Avatar>
-                  <div className="flex-1">
-                    <div className="flex items-center justify-between">
-                      <div>
-                        <p className="font-semibold">{post.author}</p>
-                        <p className="text-sm text-gray-500">
-                          {post.role} • {post.time}
-                        </p>
-                      </div>
-                      <div className="flex items-center gap-2">
-                        {post.type === "event"    && <Calendar className="h-5 w-5 text-purple-600" />}
-                        {post.type === "material" && <BookOpen  className="h-5 w-5 text-green-600"  />}
+        {loading ? (
+          <div className="flex justify-center py-12"><Loader2 className="animate-spin text-blue-600" /></div>
+        ) : posts.length === 0 ? (
+          <Card className="py-12 text-center text-gray-500">No posts yet. Be the first to share something!</Card>
+        ) : (
+          <div className="space-y-4">
+            {posts.map((post) => (
+              <Card key={post.id}>
+                <CardHeader>
+                  <div className="flex items-start gap-3">
+                    <Avatar className="h-10 w-10 bg-blue-600 text-white flex items-center justify-center rounded-full">
+                      {post.avatar || (post.author || "?").slice(0, 2).toUpperCase()}
+                    </Avatar>
+                    <div className="flex-1">
+                      <div className="flex items-center justify-between">
+                        <div>
+                          <p className="font-semibold">{post.author}</p>
+                          <p className="text-sm text-gray-500">
+                            {post.role.charAt(0).toUpperCase() + post.role.slice(1)} • {post.time}
+                          </p>
+                        </div>
+                        <div className="flex items-center gap-2">
+                          {(POST_TYPES as any)[post.type]?.icon}
+                        </div>
                       </div>
                     </div>
                   </div>
-                </div>
-              </CardHeader>
-              <CardContent>
-                <p className="text-gray-900 mb-4">{post.content}</p>
-                <div className="flex items-center gap-6 pt-3 border-t border-gray-200">
-                  <button className="flex items-center gap-2 text-gray-600 hover:text-red-600 transition-colors">
-                    <Heart className="h-5 w-5" />
-                    <span className="text-sm">{post.likes}</span>
-                  </button>
-                  <button className="flex items-center gap-2 text-gray-600 hover:text-blue-600 transition-colors">
-                    <MessageCircle className="h-5 w-5" />
-                    <span className="text-sm">{post.comments}</span>
-                  </button>
-                  <button className="flex items-center gap-2 text-gray-600 hover:text-green-600 transition-colors">
-                    <Share2 className="h-5 w-5" />
-                    <span className="text-sm">Share</span>
-                  </button>
-                  {/* Report button — only shown to signed-in non-admin users */}
-                  {user && user.role !== "admin" && (
-                    <button
-                      className="ml-auto flex items-center gap-1 text-xs text-gray-400 hover:text-red-500 transition-colors disabled:opacity-40"
-                      onClick={() => handleReport(post.id)}
-                      disabled={reporting[post.id]}
-                      title="Report this post"
+                </CardHeader>
+                <CardContent>
+                  <p className="text-gray-900 mb-4 whitespace-pre-wrap">{post.content}</p>
+                  <div className="flex items-center gap-6 pt-3 border-t border-gray-200">
+                    <button 
+                      onClick={() => handleLike(post.id)}
+                      className="flex items-center gap-2 text-gray-600 hover:text-red-600 transition-colors"
                     >
-                      <Flag className="h-4 w-4" />
-                      <span>{reporting[post.id] ? "Reporting…" : "Report"}</span>
+                      <Heart className="h-5 w-5" />
+                      <span className="text-sm">{post.likes}</span>
                     </button>
-                  )}
-                </div>
-              </CardContent>
-            </Card>
-          ))}
-        </div>
+                    <button className="flex items-center gap-2 text-gray-600 hover:text-blue-600 transition-colors">
+                      <MessageCircle className="h-5 w-5" />
+                      <span className="text-sm">{post.comments}</span>
+                    </button>
+                    <button className="flex items-center gap-2 text-gray-600 hover:text-green-600 transition-colors">
+                      <Share2 className="h-5 w-5" />
+                      <span className="text-sm">Share</span>
+                    </button>
+                    {/* Report button — only shown to signed-in non-admin users */}
+                    {user && user.id !== post.id && ( // Don't report yourself
+                      <button
+                        className="ml-auto flex items-center gap-1 text-xs text-gray-400 hover:text-red-500 transition-colors disabled:opacity-40"
+                        onClick={() => handleReport(post.id)}
+                        disabled={reporting[post.id]}
+                        title="Report this post"
+                      >
+                        <Flag className="h-4 w-4" />
+                        <span>{reporting[post.id] ? "Reporting…" : "Report"}</span>
+                      </button>
+                    )}
+                  </div>
+                </CardContent>
+              </Card>
+            ))}
+          </div>
+        )}
       </div>
     </div>
   );

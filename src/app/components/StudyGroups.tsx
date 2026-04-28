@@ -41,32 +41,7 @@ function mapDbGroup(row: DbStudyGroup): StudyGroup {
   };
 }
 
-const mockGroups = [
-  {
-    id: "1",
-    name: "Calculus 101",
-    subject: "Mathematics",
-    members: 12,
-    description: "Study group for Calculus I. Weekly meetups and problem-solving sessions.",
-    admin: "John Doe",
-  },
-  {
-    id: "2",
-    name: "Physics Lab Partners",
-    subject: "Physics",
-    members: 8,
-    description: "Group for physics lab discussions and experiment reviews.",
-    admin: "Jane Smith",
-  },
-  {
-    id: "3",
-    name: "Programming Club",
-    subject: "Computer Science",
-    members: 25,
-    description: "Learn programming together. Share code, discuss projects, and collaborate.",
-    admin: "Bob Wilson",
-  },
-];
+
 
 export function StudyGroups() {
   const navigate = useNavigate();
@@ -74,7 +49,8 @@ export function StudyGroups() {
   const [groupName, setGroupName] = useState("");
   const [groupSubject, setGroupSubject] = useState("");
   const [groupDescription, setGroupDescription] = useState("");
-  const [groups, setGroups] = useState<StudyGroup[]>(mockGroups);
+  const [groups, setGroups] = useState<StudyGroup[]>([]);
+  const [loading, setLoading] = useState(true);
 
   useEffect(() => {
     let isMounted = true;
@@ -86,9 +62,8 @@ export function StudyGroups() {
       .then((result) => {
         const { data, error } = result;
         if (error || !data || !isMounted) return;
-        if (data.length > 0) {
-          setGroups(data.map((row: unknown) => mapDbGroup(row as DbStudyGroup)));
-        }
+        setGroups(data.map((row: unknown) => mapDbGroup(row as DbStudyGroup)));
+        setLoading(false);
       });
 
     const channel = supabase

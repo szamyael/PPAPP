@@ -1,6 +1,9 @@
+import { useState } from "react";
 import { Link, useNavigate } from "react-router";
 import { useAuth } from "../contexts/AuthContext";
 import { Button } from "./ui/button";
+import { Avatar, AvatarFallback, AvatarImage } from "./ui/avatar";
+import { ProfileModal } from "./ProfileModal";
 import {
   DropdownMenu,
   DropdownMenuContent,
@@ -27,6 +30,7 @@ import {
 export function Navigation() {
   const { user, logout } = useAuth();
   const navigate = useNavigate();
+  const [profileOpen, setProfileOpen] = useState(false);
 
   const handleLogout = () => {
     logout();
@@ -85,8 +89,13 @@ export function Navigation() {
 
             <DropdownMenu>
               <DropdownMenuTrigger asChild>
-                <Button variant="ghost" size="icon" className="rounded-full">
-                  <User className="h-5 w-5" />
+                <Button variant="ghost" size="icon" className="rounded-full w-9 h-9 p-0">
+                  <Avatar className="h-8 w-8">
+                    <AvatarImage src={user?.avatarUrl} />
+                    <AvatarFallback className="bg-blue-50 text-blue-600">
+                      <User className="h-4 w-4" />
+                    </AvatarFallback>
+                  </Avatar>
                 </Button>
               </DropdownMenuTrigger>
               <DropdownMenuContent align="end" className="w-56">
@@ -97,6 +106,10 @@ export function Navigation() {
                   </div>
                 </DropdownMenuLabel>
                 <DropdownMenuSeparator />
+                <DropdownMenuItem onClick={() => setProfileOpen(true)}>
+                  <User className="mr-2 h-4 w-4" />
+                  Edit Profile
+                </DropdownMenuItem>
                 <DropdownMenuItem onClick={() => navigate(`/dashboard/${user?.role}`)}>
                   <Home className="mr-2 h-4 w-4" />
                   Dashboard
@@ -147,6 +160,7 @@ export function Navigation() {
           </div>
         </div>
       </div>
+      <ProfileModal open={profileOpen} onOpenChange={setProfileOpen} />
     </nav>
   );
 }

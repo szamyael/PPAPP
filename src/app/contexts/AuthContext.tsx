@@ -12,10 +12,20 @@ export interface User {
   email: string;
   role: UserRole;
   name: string;
+  avatarUrl?: string;
+  firstName?: string;
+  middleName?: string;
+  lastName?: string;
+  suffix?: string;
   organizationId?: string;
   organizationName?: string;
   uniqueCode?: string;
   approved: boolean;
+  // Student fields
+  studentId?: string;
+  program?: string;
+  yearLevel?: string;
+  department?: string;
 }
 
 interface AuthContextType {
@@ -27,6 +37,7 @@ interface AuthContextType {
   logout: () => void;
   register: (userData: RegisterPayload) => Promise<boolean>;
   verifyOtp: (email: string, token: string) => Promise<boolean>;
+  updateProfile: (updates: Partial<User>) => Promise<{ success: boolean; error?: string }>;
 }
 
 interface RegisterPayload {
@@ -73,10 +84,19 @@ function profileToUser(
     email,
     role: profile.role as UserRole,
     name: profile.full_name ?? "",
+    avatarUrl: profile.avatar_url ?? undefined,
+    firstName: profile.first_name ?? undefined,
+    middleName: profile.middle_name ?? undefined,
+    lastName: profile.last_name ?? undefined,
+    suffix: profile.suffix ?? undefined,
     organizationId: profile.organization_id ?? undefined,
     organizationName: profile.organizations?.name ?? undefined,
     uniqueCode: profile.organizations?.unique_code ?? undefined,
     approved: profile.approval_status === "approved",
+    studentId: profile.student_id ?? undefined,
+    program: profile.program ?? undefined,
+    yearLevel: profile.year_level ?? undefined,
+    department: profile.department ?? undefined,
   };
 }
 
@@ -326,9 +346,42 @@ export const AuthProvider: React.FC<{ children: React.ReactNode }> = ({
     return true;
   };
 
+  const updateProfile = async (updates: Partial<User>): Promise<{ success: boolean; error?: string }> => {
+    if (!user) return { success: false, error: "Not authenticated" };
+
+    const profileUpdates: Record<string, any> = {};
+    if (updates.name !== undefined) profileUpdates.full_name = updates.name;
+    if (updates.avatarUrl !== undefined) profileUpdates.avatar_url = updates.avatarUrl;
+    if (updates.firstName !== undefined) profileUpdates.first_name = updates.firstName;
+    if (updates.middleName !== undefined) profileUpdates.middle_name = updates.middleName;
+    if (updates.lastName !== undefined) profileUpdates.last_name = updates.lastName;
+    if (updates.suffix !== undefined) profileUpdates.suffix = updates.suffix;
+    if (updates.studentId !== undefined) profileUpdates.student_id = updates.studentId;
+    if (updates.program !== undefined) profileUpdates.program = updates.program;
+    if (updates.yearLevel !== undefined) profileUpdates.year_level = updates.yearLevel;
+    if (updates.department !== undefined) profileUpdates.department = updates.department;
+
+    const { error } = await supabase
+      .from("profiles")
+      .update(profileUpdates)
+      .eq("id", user.id);
+
+    if (error) {
+      return { success: false, error: error.message };
+    }
+
+    // Refresh user state
+    if (session) {
+      const appUser = await loadProfile(session);
+      setUser(appUser);
+    }
+
+    return { success: true };
+  };
+
   return (
     <AuthContext.Provider
-      value={{ user, session, loading, loginError, login, logout, register, verifyOtp }}
+      value={{ user, session, loading, loginError, login, logout, register, verifyOtp, updateProfile }}
     >
       {children}
     </AuthContext.Provider>

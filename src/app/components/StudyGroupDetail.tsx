@@ -112,63 +112,19 @@ function mapDbFile(row: DbGroupFile): StudyGroupFile {
   };
 }
 
-const mockGroups = [
-  {
-    id: "1",
-    name: "Calculus 101",
-    subject: "Mathematics",
-    members: 12,
-    description: "Study group for Calculus I. Weekly meetups and problem-solving sessions.",
-    admin: "John Doe",
-  },
-  {
-    id: "2",
-    name: "Physics Lab Partners",
-    subject: "Physics",
-    members: 8,
-    description: "Group for physics lab discussions and experiment reviews.",
-    admin: "Jane Smith",
-  },
-  {
-    id: "3",
-    name: "Programming Club",
-    subject: "Computer Science",
-    members: 25,
-    description: "Learn programming together. Share code, discuss projects, and collaborate.",
-    admin: "Bob Wilson",
-  },
-];
 
-const mockMembers = [
-  { name: "John Doe", initials: "JD", role: "Admin" },
-  { name: "Sarah Williams", initials: "SW", role: "Member" },
-  { name: "Alice Cooper", initials: "AC", role: "Member" },
-  { name: "Bob Martinez", initials: "BM", role: "Member" },
-];
-
-const mockMessages = [
-  { id: "1", sender: "John Doe", initials: "JD", time: "10:05 AM", text: "Welcome! Drop questions here." },
-  { id: "2", sender: "Sarah Williams", initials: "SW", time: "10:12 AM", text: "Can someone explain derivatives quickly?" },
-  { id: "3", sender: "You", initials: "YU", time: "10:15 AM", text: "Sure — let’s start with the limit definition." },
-];
-
-const mockFiles = [
-  { id: "f1", name: "Derivatives Cheat Sheet.pdf", sharedBy: "John Doe", time: "Yesterday" },
-  { id: "f2", name: "Practice Set 1.docx", sharedBy: "Sarah Williams", time: "2 days ago" },
-];
 
 export function StudyGroupDetail() {
   const navigate = useNavigate();
   const { groupId } = useParams();
 
   const [dbGroup, setDbGroup] = useState<StudyGroup | null>(null);
-  const [messages, setMessages] = useState<StudyGroupMessage[]>(mockMessages);
-  const [files, setFiles] = useState<StudyGroupFile[]>(mockFiles);
+  const [messages, setMessages] = useState<StudyGroupMessage[]>([]);
+  const [files, setFiles] = useState<StudyGroupFile[]>([]);
+  const [members, setMembers] = useState<{ name: string; initials: string; role: string }[]>([]);
+  const [loading, setLoading] = useState(true);
 
-  const group = useMemo(
-    () => dbGroup ?? mockGroups.find((g) => g.id === groupId) ?? null,
-    [dbGroup, groupId],
-  );
+  const group = dbGroup;
 
   const [newMessage, setNewMessage] = useState("");
   const [selectedFileName, setSelectedFileName] = useState<string | null>(null);
@@ -207,9 +163,23 @@ export function StudyGroupDetail() {
       .order("created_at", { ascending: false })
       .then(({ data, error }) => {
         if (error || !isMounted || !data) return;
-        if (data.length > 0) {
-          setFiles(data.map((row) => mapDbFile(row as DbGroupFile)));
-        }
+        setFiles(data.map((row) => mapDbFile(row as DbGroupFile)));
+      });
+
+    void supabase
+      .from("study_group_members")
+      .select("role, profiles(full_name)")
+      .eq("group_id", groupId)
+      .then(({ data, error }) => {
+        if (error || !isMounted || !data) return;
+        setMembers(
+          (data as any[]).map((m) => ({
+            name: m.profiles?.full_name || "Unknown",
+            initials: toInitials(m.profiles?.full_name || "Unknown"),
+            role: m.role.charAt(0).toUpperCase() + m.role.slice(1),
+          }))
+        );
+        setLoading(false);
       });
 
     const channel = supabase
@@ -449,17 +419,21 @@ export function StudyGroupDetail() {
                 <CardDescription>People in this study group</CardDescription>
               </CardHeader>
               <CardContent className="grid md:grid-cols-2 gap-4">
-                {mockMembers.map((m) => (
-                  <div key={m.name} className="flex items-center gap-3 border border-gray-200 rounded-lg p-3">
-                    <Avatar className="h-10 w-10 bg-blue-600 text-white flex items-center justify-center rounded-full">
-                      {m.initials}
-                    </Avatar>
-                    <div className="flex-1">
-                      <p className="font-semibold">{m.name}</p>
-                      <p className="text-xs text-gray-500">{m.role}</p>
+                {members.length === 0 ? (
+                  <p className="text-gray-500 text-center py-8 col-span-2">No members found.</p>
+                ) : (
+                  members.map((m) => (
+                    <div key={m.name} className="flex items-center gap-3 border border-gray-200 rounded-lg p-3">
+                      <Avatar className="h-10 w-10 bg-blue-600 text-white flex items-center justify-center rounded-full">
+                        {m.initials}
+                      </Avatar>
+                      <div className="flex-1">
+                        <p className="font-semibold">{m.name}</p>
+                        <p className="text-xs text-gray-500">{m.role}</p>
+                      </div>
                     </div>
-                  </div>
-                ))}
+                  ))
+                )}
               </CardContent>
             </Card>
           </TabsContent>

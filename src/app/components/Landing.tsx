@@ -13,7 +13,7 @@ export function Landing() {
     if (user) {
       navigate(`/dashboard/${user.role}`);
     } else {
-      navigate("/login");
+      navigate("/register");
     }
   };
 

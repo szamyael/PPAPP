@@ -94,18 +94,17 @@ export function Login() {
             </Button>
           </form>
 
-          <div className="mt-6 space-y-2 text-center">
-            <p className="text-sm text-gray-600">
-              New here?{" "}
-              <Link to="/register/student" className="text-blue-600 hover:underline">Register as Student</Link>
-              {" · "}
-              <Link to="/register/tutor" className="text-blue-600 hover:underline">Apply as Tutor</Link>
+          <div className="mt-8 pt-6 border-t border-gray-100 text-center">
+            <p className="text-sm text-gray-600 mb-4">
+              Don't have an account yet?
             </p>
-            <p className="text-sm text-gray-600">
-              <Link to="/register/organization" className="text-gray-500 hover:underline">
-                Request Organization Account
-              </Link>
-            </p>
+            <Button
+              variant="outline"
+              className="w-full border-blue-200 hover:border-blue-400 hover:bg-blue-50 text-blue-700"
+              onClick={() => navigate("/register")}
+            >
+              Register Now
+            </Button>
           </div>
         </CardContent>
       </Card>

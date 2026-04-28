@@ -1,4 +1,4 @@
-import { useState } from "react";
+import { useEffect, useState } from "react";
 import { useNavigate } from "react-router";
 import { Navigation } from "./Navigation";
 import { Button } from "./ui/button";
@@ -6,63 +6,103 @@ import { Input } from "./ui/input";
 import { Card, CardContent, CardDescription, CardHeader, CardTitle } from "./ui/card";
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from "./ui/select";
 import { Badge } from "./ui/badge";
-import { Star, Search, BookOpen, Calendar, DollarSign } from "lucide-react";
+import { Star, Search, BookOpen, Calendar, DollarSign, Loader2 } from "lucide-react";
+import { supabase } from "../lib/supabaseClient";
 
-const mockTutors = [
-  {
-    id: "1",
-    name: "Dr. Michael Johnson",
-    subjects: ["Mathematics", "Statistics"],
-    organization: "Excellence Tutoring Center",
-    rating: 4.9,
-    reviewCount: 45,
-    hourlyRate: 50,
-    experience: "PhD in Mathematics",
-    availability: "Mon-Fri, 2PM-8PM",
-  },
-  {
-    id: "2",
-    name: "Sarah Williams",
-    subjects: ["Physics", "Chemistry"],
-    organization: "Academic Success Institute",
-    rating: 4.8,
-    reviewCount: 38,
-    hourlyRate: 45,
-    experience: "MSc in Physics",
-    availability: "Tue-Sat, 10AM-6PM",
-  },
-  {
-    id: "3",
-    name: "Prof. James Chen",
-    subjects: ["Computer Science", "Programming"],
-    organization: "Tech Academy",
-    rating: 5.0,
-    reviewCount: 62,
-    hourlyRate: 60,
-    experience: "15 years teaching experience",
-    availability: "Mon-Thu, 4PM-9PM",
-  },
-  {
-    id: "4",
-    name: "Dr. Emily Davis",
-    subjects: ["Biology", "Chemistry"],
-    organization: "Excellence Tutoring Center",
-    rating: 4.7,
-    reviewCount: 29,
-    hourlyRate: 48,
-    experience: "PhD in Molecular Biology",
-    availability: "Wed-Sun, 1PM-7PM",
-  },
-];
+interface Tutor {
+  id: string;
+  user_id: string;
+  full_name: string;
+  avatar_url: string;
+  subjects: string[];
+  organization_name: string;
+  rating: number;
+  reviewCount: number;
+  hourlyRate: number;
+  experience: string;
+  education: string;
+  bio: string;
+}
 
 export function FindTutors() {
   const navigate = useNavigate();
   const [searchTerm, setSearchTerm] = useState("");
   const [subjectFilter, setSubjectFilter] = useState("all");
+  const [tutors, setTutors] = useState<Tutor[]>([]);
+  const [loading, setLoading] = useState(true);
 
-  const filteredTutors = mockTutors.filter((tutor) => {
+  useEffect(() => {
+    fetchTutors();
+  }, []);
+
+  const fetchTutors = async () => {
+    setLoading(true);
+    try {
+      // Fetch tutors joined with profiles and organizations
+      const { data, error } = await supabase
+        .from("tutor_profiles")
+        .select(`
+          id,
+          user_id,
+          hourly_rate,
+          subjects,
+          experience,
+          education,
+          bio,
+          profiles:user_id (
+            full_name,
+            avatar_url
+          ),
+          organizations:organization_id (
+            name
+          )
+        `)
+        .eq("approval_status", "approved");
+
+      if (error) throw error;
+
+      // Fetch ratings for these tutors
+      const tutorUserIds = data.map(t => t.user_id);
+      const { data: ratingsData, error: ratingsError } = await supabase
+        .from("ratings")
+        .select("rated_user, stars")
+        .in("rated_user", tutorUserIds);
+
+      if (ratingsError) throw ratingsError;
+
+      const mappedTutors: Tutor[] = data.map((t: any) => {
+        const tutorRatings = ratingsData.filter(r => r.rated_user === t.user_id);
+        const avgRating = tutorRatings.length > 0 
+          ? tutorRatings.reduce((sum, r) => sum + r.stars, 0) / tutorRatings.length 
+          : 0;
+
+        return {
+          id: t.id,
+          user_id: t.user_id,
+          full_name: t.profiles?.full_name || "Unknown Tutor",
+          avatar_url: t.profiles?.avatar_url || "",
+          subjects: t.subjects || [],
+          organization_name: t.organizations?.name || "Independent",
+          rating: Number(avgRating.toFixed(1)),
+          reviewCount: tutorRatings.length,
+          hourlyRate: t.hourly_rate || 0,
+          experience: t.experience || "",
+          education: t.education || "",
+          bio: t.bio || "",
+        };
+      });
+
+      setTutors(mappedTutors);
+    } catch (error) {
+      console.error("Error fetching tutors:", error);
+    } finally {
+      setLoading(false);
+    }
+  };
+
+  const filteredTutors = tutors.filter((tutor) => {
     const matchesSearch =
-      tutor.name.toLowerCase().includes(searchTerm.toLowerCase()) ||
+      tutor.full_name.toLowerCase().includes(searchTerm.toLowerCase()) ||
       tutor.subjects.some((s) => s.toLowerCase().includes(searchTerm.toLowerCase()));
     const matchesSubject =
       subjectFilter === "all" || tutor.subjects.includes(subjectFilter);
@@ -112,61 +152,67 @@ export function FindTutors() {
         </Card>
 
         {/* Tutors List */}
-        <div className="grid md:grid-cols-2 gap-6">
-          {filteredTutors.map((tutor) => (
-            <Card
-              key={tutor.id}
-              className="hover:shadow-lg transition-shadow cursor-pointer"
-              onClick={() => navigate(`/book/${tutor.id}`)}
-            >
-              <CardHeader>
-                <div className="flex items-start justify-between">
-                  <div>
-                    <CardTitle>{tutor.name}</CardTitle>
-                    <CardDescription className="mt-1">{tutor.organization}</CardDescription>
-                  </div>
-                  <div className="flex items-center gap-1">
-                    <Star className="h-5 w-5 fill-yellow-400 text-yellow-400" />
-                    <span className="font-semibold">{tutor.rating}</span>
-                    <span className="text-sm text-gray-500">({tutor.reviewCount})</span>
-                  </div>
-                </div>
-              </CardHeader>
-              <CardContent>
-                <div className="space-y-4">
-                  <div>
-                    <p className="text-sm font-medium text-gray-700 mb-2">Subjects:</p>
-                    <div className="flex flex-wrap gap-2">
-                      {tutor.subjects.map((subject) => (
-                        <Badge key={subject} variant="secondary">
-                          {subject}
-                        </Badge>
-                      ))}
+        {loading ? (
+          <div className="flex justify-center py-24">
+            <Loader2 className="h-12 w-12 animate-spin text-blue-600" />
+          </div>
+        ) : (
+          <div className="grid md:grid-cols-2 gap-6">
+            {filteredTutors.map((tutor) => (
+              <Card
+                key={tutor.id}
+                className="hover:shadow-lg transition-shadow cursor-pointer"
+                onClick={() => navigate(`/book/${tutor.user_id}`)}
+              >
+                <CardHeader>
+                  <div className="flex items-start justify-between">
+                    <div>
+                      <CardTitle>{tutor.full_name}</CardTitle>
+                      <CardDescription className="mt-1">{tutor.organization_name}</CardDescription>
+                    </div>
+                    <div className="flex items-center gap-1">
+                      <Star className="h-5 w-5 fill-yellow-400 text-yellow-400" />
+                      <span className="font-semibold">{tutor.rating || "New"}</span>
+                      {tutor.reviewCount > 0 && (
+                        <span className="text-sm text-gray-500">({tutor.reviewCount})</span>
+                      )}
                     </div>
                   </div>
-
-                  <div className="flex items-center gap-2 text-sm text-gray-600">
-                    <BookOpen className="h-4 w-4" />
-                    {tutor.experience}
-                  </div>
-
-                  <div className="flex items-center gap-2 text-sm text-gray-600">
-                    <Calendar className="h-4 w-4" />
-                    {tutor.availability}
-                  </div>
-
-                  <div className="flex items-center justify-between pt-2 border-t">
-                    <div className="flex items-center gap-2 text-lg font-semibold text-green-600">
-                      <DollarSign className="h-5 w-5" />
-                      {tutor.hourlyRate}/hour
+                </CardHeader>
+                <CardContent>
+                  <div className="space-y-4">
+                    <div>
+                      <p className="text-sm font-medium text-gray-700 mb-2">Subjects:</p>
+                      <div className="flex flex-wrap gap-2">
+                        {tutor.subjects.map((subject) => (
+                          <Badge key={subject} variant="secondary">
+                            {subject}
+                          </Badge>
+                        ))}
+                      </div>
                     </div>
-                    <Button onClick={() => navigate(`/book/${tutor.id}`)}>Book Session</Button>
+
+                    <div className="flex items-center gap-2 text-sm text-gray-600 line-clamp-1">
+                      <BookOpen className="h-4 w-4 shrink-0" />
+                      {tutor.experience || tutor.education || "Qualified Tutor"}
+                    </div>
+
+                    <div className="flex items-center justify-between pt-2 border-t">
+                      <div className="flex items-center gap-2 text-lg font-semibold text-green-600">
+                        <DollarSign className="h-5 w-5" />
+                        ₱{tutor.hourlyRate}/hour
+                      </div>
+                      <Button onClick={(e) => {
+                        e.stopPropagation();
+                        navigate(`/book/${tutor.user_id}`);
+                      }}>Book Session</Button>
+                    </div>
                   </div>
-                </div>
-              </CardContent>
-            </Card>
-          ))}
-        </div>
+                </CardContent>
+              </Card>
+            ))}
+          </div>
+        )}
 
         {filteredTutors.length === 0 && (
           <Card>

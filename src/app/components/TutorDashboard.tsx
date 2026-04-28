@@ -1,20 +1,159 @@
-import { useEffect, type ReactNode } from "react";
+import { useEffect, useState, type ReactNode } from "react";
 import { useNavigate } from "react-router";
 import { useAuth } from "../contexts/AuthContext";
 import { Navigation } from "./Navigation";
 import { Button } from "./ui/button";
 import { Card, CardContent, CardDescription, CardHeader, CardTitle } from "./ui/card";
-import { Calendar, DollarSign, Users, Star, TrendingUp, BookOpen, PenTool } from "lucide-react";
+import { Calendar, DollarSign, Users, Star, TrendingUp, BookOpen, PenTool, Loader2 } from "lucide-react";
+import { supabase } from "../lib/supabaseClient";
+
+interface DashboardStats {
+  sessionsThisMonth: number;
+  activeStudents: number;
+  averageRating: number;
+  earnings: number;
+}
+
+interface UpcomingSession {
+  id: string;
+  student_name: string;
+  subject: string;
+  date: string;
+  time: string;
+  duration: string;
+}
+
+interface Review {
+  id: string;
+  student_name: string;
+  rating: number;
+  comment: string;
+  improvement: string | null;
+}
 
 export function TutorDashboard() {
   const { user } = useAuth();
   const navigate = useNavigate();
+  const [stats, setStats] = useState<DashboardStats>({
+    sessionsThisMonth: 0,
+    activeStudents: 0,
+    averageRating: 0,
+    earnings: 0,
+  });
+  const [upcomingSessions, setUpcomingSessions] = useState<UpcomingSession[]>([]);
+  const [reviews, setReviews] = useState<Review[]>([]);
+  const [loading, setLoading] = useState(true);
 
   useEffect(() => {
     if (!user || user.role !== "tutor") {
       navigate("/login");
+      return;
     }
+    fetchDashboardData();
   }, [user, navigate]);
+
+  const fetchDashboardData = async () => {
+    if (!user) return;
+    setLoading(true);
+    try {
+      // 1. Fetch upcoming sessions
+      const { data: sessionsData, error: sessionsError } = await supabase
+        .from("bookings")
+        .select(`
+          id,
+          subject,
+          start_time,
+          end_time,
+          student:profiles!bookings_student_id_fkey (
+            full_name
+          )
+        `)
+        .eq("tutor_id", user.id)
+        .gte("start_time", new Date().toISOString())
+        .eq("status", "confirmed")
+        .order("start_time", { ascending: true })
+        .limit(3);
+
+      if (sessionsError) throw sessionsError;
+
+      setUpcomingSessions(
+        (sessionsData || []).map((s: any) => {
+          const start = new Date(s.start_time);
+          const end = new Date(s.end_time);
+          const durationHours = (end.getTime() - start.getTime()) / (1000 * 60 * 60);
+
+          return {
+            id: s.id,
+            subject: s.subject,
+            student_name: s.student?.full_name || "Unknown Student",
+            date: start.toLocaleDateString("en-US", { month: "short", day: "numeric", year: "numeric" }),
+            time: start.toLocaleTimeString("en-US", { hour: "numeric", minute: "2-digit" }),
+            duration: `${durationHours} hour${durationHours !== 1 ? "s" : ""}`,
+          };
+        })
+      );
+
+      // 2. Stats (Earnings and Sessions This Month)
+      const startOfMonth = new Date();
+      startOfMonth.setDate(1);
+      startOfMonth.setHours(0, 0, 0, 0);
+
+      const { data: monthData, error: monthError } = await supabase
+        .from("bookings")
+        .select("total_amount, student_id")
+        .eq("tutor_id", user.id)
+        .eq("status", "completed")
+        .gte("start_time", startOfMonth.toISOString());
+
+      if (monthError) throw monthError;
+
+      const earnings = (monthData || []).reduce((sum, b) => sum + b.total_amount, 0);
+      const uniqueStudents = new Set((monthData || []).map(b => b.student_id)).size;
+
+      // 3. Average Rating and Reviews
+      const { data: ratingData, error: ratingError } = await supabase
+        .from("ratings")
+        .select(`
+          id,
+          stars,
+          comment,
+          proof_url,
+          student:profiles!ratings_rated_by_fkey (
+            full_name
+          )
+        `)
+        .eq("rated_user", user.id)
+        .order("created_at", { ascending: false });
+
+      if (ratingError) throw ratingError;
+
+      const avgRating = ratingData.length > 0
+        ? ratingData.reduce((sum, r) => sum + r.stars, 0) / ratingData.length
+        : 0;
+
+      setReviews(
+        (ratingData || []).slice(0, 3).map((r: any) => ({
+          id: r.id,
+          student_name: r.student?.full_name || "Anonymous",
+          rating: r.stars,
+          comment: r.comment || "No comment",
+          improvement: r.proof_url ? "Progress proof uploaded" : null,
+        }))
+      );
+
+      setStats({
+        sessionsThisMonth: (monthData || []).length,
+        activeStudents: uniqueStudents,
+        averageRating: Number(avgRating.toFixed(1)),
+        earnings: Number((earnings * 0.95).toFixed(2)), // 5% platform commission
+      });
+
+    } catch (error) {
+      console.error("Dashboard fetch error:", error);
+    } finally {
+      setLoading(false);
+    }
+  };
 
   if (!user) return null;
 
@@ -49,28 +188,38 @@ export function TutorDashboard() {
         </div>
 
         {/* Quick Stats */}
-        <div className="grid md:grid-cols-4 gap-6 mb-8">
-          <StatCard
-            icon={<Calendar className="h-8 w-8 text-blue-600" />}
-            label="Sessions This Month"
-            value="24"
-          />
-          <StatCard
-            icon={<Users className="h-8 w-8 text-purple-600" />}
-            label="Active Students"
-            value="18"
-          />
-          <StatCard
-            icon={<Star className="h-8 w-8 text-yellow-600" />}
-            label="Average Rating"
-            value="4.9"
-          />
-          <StatCard
-            icon={<DollarSign className="h-8 w-8 text-green-600" />}
-            label="Earnings (95%)"
-            value="$1,850"
-          />
-        </div>
+        {loading ? (
+          <div className="grid md:grid-cols-4 gap-6 mb-8">
+            {[1, 2, 3, 4].map((i) => (
+              <Card key={i} className="animate-pulse">
+                <CardContent className="pt-6 h-24 bg-gray-100 rounded-lg"></CardContent>
+              </Card>
+            ))}
+          </div>
+        ) : (
+          <div className="grid md:grid-cols-4 gap-6 mb-8">
+            <StatCard
+              icon={<Calendar className="h-8 w-8 text-blue-600" />}
+              label="Sessions This Month"
+              value={stats.sessionsThisMonth.toString()}
+            />
+            <StatCard
+              icon={<Users className="h-8 w-8 text-purple-600" />}
+              label="Active Students"
+              value={stats.activeStudents.toString()}
+            />
+            <StatCard
+              icon={<Star className="h-8 w-8 text-yellow-600" />}
+              label="Average Rating"
+              value={stats.averageRating > 0 ? stats.averageRating.toString() : "N/A"}
+            />
+            <StatCard
+              icon={<DollarSign className="h-8 w-8 text-green-600" />}
+              label="Earnings (95%)"
+              value={`₱${stats.earnings}`}
+            />
+          </div>
+        )}
 
         {/* Quick Actions */}
         <div className="grid md:grid-cols-3 gap-6 mb-8">
@@ -125,29 +274,24 @@ export function TutorDashboard() {
               <CardDescription>Your scheduled tutoring sessions</CardDescription>
             </CardHeader>
             <CardContent>
-              <div className="space-y-4">
-                <SessionItem
-                  student="John Doe"
-                  subject="Mathematics - Calculus"
-                  date="Apr 17, 2026"
-                  time="2:00 PM"
-                  duration="2 hours"
-                />
-                <SessionItem
-                  student="Jane Smith"
-                  subject="Mathematics - Linear Algebra"
-                  date="Apr 18, 2026"
-                  time="10:00 AM"
-                  duration="1.5 hours"
-                />
-                <SessionItem
-                  student="Bob Wilson"
-                  subject="Statistics"
-                  date="Apr 20, 2026"
-                  time="4:00 PM"
-                  duration="2 hours"
-                />
-              </div>
+              {loading ? (
+                <div className="flex justify-center py-8"><Loader2 className="animate-spin text-blue-600" /></div>
+              ) : upcomingSessions.length === 0 ? (
+                <p className="text-center py-8 text-gray-500">No upcoming sessions</p>
+              ) : (
+                <div className="space-y-4">
+                  {upcomingSessions.map((s) => (
+                    <SessionItem
+                      key={s.id}
+                      student={s.student_name}
+                      subject={s.subject}
+                      date={s.date}
+                      time={s.time}
+                      duration={s.duration}
+                    />
+                  ))}
+                </div>
+              )}
               <Button
                 variant="outline"
                 className="w-full mt-4"
@@ -164,26 +308,23 @@ export function TutorDashboard() {
               <CardDescription>What students are saying about you</CardDescription>
             </CardHeader>
             <CardContent>
-              <div className="space-y-4">
-                <ReviewItem
-                  student="Sarah Johnson"
-                  rating={5}
-                  comment="Excellent tutor! Really helped me understand calculus concepts."
-                  improvement="Grade improved from C to A"
-                />
-                <ReviewItem
-                  student="Mike Chen"
-                  rating={5}
-                  comment="Patient and knowledgeable. Highly recommended!"
-                  improvement="Grade improved from B to A+"
-                />
-                <ReviewItem
-                  student="Emily Davis"
-                  rating={4}
-                  comment="Very helpful sessions. Clear explanations."
-                  improvement={null}
-                />
-              </div>
+              {loading ? (
+                <div className="flex justify-center py-8"><Loader2 className="animate-spin text-blue-600" /></div>
+              ) : reviews.length === 0 ? (
+                <p className="text-center py-8 text-gray-500">No reviews yet</p>
+              ) : (
+                <div className="space-y-4">
+                  {reviews.map((r) => (
+                    <ReviewItem
+                      key={r.id}
+                      student={r.student_name}
+                      rating={r.rating}
+                      comment={r.comment}
+                      improvement={r.improvement}
+                    />
+                  ))}
+                </div>
+              )}
             </CardContent>
           </Card>
         </div>
