@@ -4,7 +4,7 @@ import { Button } from "./ui/button";
 import { Textarea } from "./ui/textarea";
 import { Card, CardContent, CardHeader } from "./ui/card";
 import { Avatar } from "./ui/avatar";
-import { Heart, MessageCircle, Share2, Send, Calendar, BookOpen, Flag } from "lucide-react";
+import { Heart, MessageCircle, Share2, Send, Calendar, BookOpen, Flag, Bell } from "lucide-react";
 import { toast } from "sonner";
 import { supabase } from "../lib/supabaseClient";
 import { useAuth } from "../contexts/AuthContext";
@@ -17,6 +17,36 @@ const POST_TYPES = {
   event:        { icon: <Calendar      className="h-5 w-5 text-purple-600" />, label: "Event" },
   material:     { icon: <BookOpen      className="h-5 w-5 text-green-600" />,  label: "Material" },
 };
+
+interface DbFeedPost {
+  id: string;
+  author_name: string;
+  author_role: string;
+  author_avatar: string;
+  post_type: string;
+  content: string;
+  likes_count: number;
+  comments_count: number;
+  created_at: string;
+}
+
+interface FeedPost extends DbFeedPost {
+  timeAgo: string;
+}
+
+function mapDbPost(row: DbFeedPost): FeedPost {
+  const now = new Date();
+  const created = new Date(row.created_at);
+  const diffMs = now.getTime() - created.getTime();
+  const diffMins = Math.floor(diffMs / 60000);
+
+  let timeAgo = "just now";
+  if (diffMins < 60) timeAgo = `${diffMins}m ago`;
+  else if (diffMins < 1440) timeAgo = `${Math.floor(diffMins / 60)}h ago`;
+  else timeAgo = `${Math.floor(diffMins / 1440)}d ago`;
+
+  return { ...row, timeAgo };
+}
 
 export function Newsfeed() {
   const { user, session } = useAuth();
@@ -45,6 +75,9 @@ export function Newsfeed() {
       setLoading(false);
     }
   };
+
+  useEffect(() => {
+    let isMounted = true;
 
     const channel = supabase
       .channel("newsfeed-posts")
