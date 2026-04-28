@@ -1,7 +1,7 @@
 import { useEffect, useMemo, useRef, useState } from "react";
 import { MessageCircle, Send } from "lucide-react";
 import { toast } from "sonner";
-import { publicAnonKey, supabaseFunctionsBaseUrl } from "../../../utils/supabase/info";
+import { supabaseFunctionsBaseUrl } from "../../../utils/supabase/info";
 import { Button } from "./ui/button";
 import { Input } from "./ui/input";
 import { Label } from "./ui/label";
@@ -82,8 +82,6 @@ export function FloatingSupportWidget() {
   const headers = useMemo(
     () => ({
       "Content-Type": "application/json",
-      Authorization: `Bearer ${publicAnonKey}`,
-      apikey: publicAnonKey,
     }),
     [],
   );

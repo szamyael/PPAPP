@@ -70,7 +70,7 @@ app.post("/make-server-45108270/moderation/review", async (c) => {
 });
 
 // ─────────────────────────────────────────────
-// Support chat
+// Support chat (public — no auth required)
 // ─────────────────────────────────────────────
 app.post("/make-server-45108270/support/chat", async (c) => {
   try {
