@@ -270,12 +270,26 @@ export function FloatingSupportWidget() {
                 <TabsTrigger className="flex-1" value="chat">
                   Chat
                 </TabsTrigger>
+                <TabsTrigger className="flex-1" value="tutorial">
+                  Guide
+                </TabsTrigger>
+                <TabsTrigger className="flex-1" value="info">
+                  Info
+                </TabsTrigger>
                 <TabsTrigger className="flex-1" value="ticket">
-                  File Ticket
+                  Ticket
                 </TabsTrigger>
               </TabsList>
 
-              <TabsContent value="chat" className="mt-4">
+              <TabsContent value="chat" className="mt-4 space-y-3">
+                {/* Quick choice buttons */}
+                <div className="grid grid-cols-2 gap-2">
+                  <button onClick={() => { setChatInput("How do I book a session?"); }} className="text-xs p-2 border rounded hover:bg-gray-50">📅 Book Session</button>
+                  <button onClick={() => { setChatInput("How do I join a video call?"); }} className="text-xs p-2 border rounded hover:bg-gray-50">🎥 Join Call</button>
+                  <button onClick={() => { setChatInput("Why can't I login?"); }} className="text-xs p-2 border rounded hover:bg-gray-50">🔐 Login Issue</button>
+                  <button onClick={() => { setChatInput("How do I rate a tutor?"); }} className="text-xs p-2 border rounded hover:bg-gray-50">⭐ Rate Tutor</button>
+                </div>
+
                 <ScrollArea className="h-80 rounded-md border border-gray-200 bg-white p-3">
                   <div className="space-y-3">
                     {messages.map((m) => (
@@ -320,46 +334,104 @@ export function FloatingSupportWidget() {
                 </div>
               </TabsContent>
 
+              <TabsContent value="tutorial" className="mt-4">
+                <ScrollArea className="h-96 rounded-md border border-gray-200 bg-white p-3">
+                  <div className="space-y-3 text-sm">
+                    <div>
+                      <h3 className="font-semibold mb-2">👤 For Students</h3>
+                      <ol className="list-decimal ml-4 space-y-1 text-xs">
+                        <li>Sign up with email</li>
+                        <li>Wait for admin approval</li>
+                        <li>Go to Dashboard</li>
+                        <li>Click "Find a Tutor"</li>
+                        <li>Select tutor & book session</li>
+                        <li>Join video call when ready</li>
+                      </ol>
+                    </div>
+                    <div>
+                      <h3 className="font-semibold mb-2">🎓 For Tutors</h3>
+                      <ol className="list-decimal ml-4 space-y-1 text-xs">
+                        <li>Sign up with organization code</li>
+                        <li>Wait for approval</li>
+                        <li>Upload credentials</li>
+                        <li>Set availability</li>
+                        <li>Accept bookings</li>
+                        <li>Conduct sessions</li>
+                      </ol>
+                    </div>
+                  </div>
+                </ScrollArea>
+              </TabsContent>
+
+              <TabsContent value="info" className="mt-4">
+                <ScrollArea className="h-96 rounded-md border border-gray-200 bg-white p-3">
+                  <div className="space-y-2 text-xs">
+                    <div className="bg-blue-50 p-2 rounded">
+                      <p className="font-semibold">💾 Database</p>
+                      <p>Supabase PostgreSQL with real-time updates</p>
+                    </div>
+                    <div className="bg-green-50 p-2 rounded">
+                      <p className="font-semibold">🔒 Security</p>
+                      <p>All data encrypted & access-controlled</p>
+                    </div>
+                    <div className="bg-purple-50 p-2 rounded">
+                      <p className="font-semibold">🎯 Features</p>
+                      <p>Video sessions, materials library, study groups, ratings</p>
+                    </div>
+                    <div className="bg-orange-50 p-2 rounded">
+                      <p className="font-semibold">⚡ Limits</p>
+                      <p>~5 chat questions/session to save API costs</p>
+                    </div>
+                    <div className="bg-gray-50 p-2 rounded border">
+                      <p className="font-semibold">📞 Need Help?</p>
+                      <p className="mt-1">Use Chat for quick answers, or File a Ticket for bugs/issues</p>
+                    </div>
+                  </div>
+                </ScrollArea>
+              </TabsContent>
+
               <TabsContent value="ticket" className="mt-4">
-                <div className="space-y-4">
-                  <div className="space-y-2">
-                    <Label htmlFor="ticketEmail">Email (optional)</Label>
-                    <Input
-                      id="ticketEmail"
-                      value={ticketEmail}
-                      onChange={(e) => setTicketEmail(e.target.value)}
-                      placeholder="name@example.com"
-                    />
-                  </div>
+                <ScrollArea className="h-96 rounded-md border border-gray-200 bg-white p-3">
+                  <div className="space-y-4">
+                    <div className="space-y-2">
+                      <Label htmlFor="ticketEmail">Email (optional)</Label>
+                      <Input
+                        id="ticketEmail"
+                        value={ticketEmail}
+                        onChange={(e) => setTicketEmail(e.target.value)}
+                        placeholder="name@example.com"
+                      />
+                    </div>
 
-                  <div className="space-y-2">
-                    <Label htmlFor="ticketSubject">Subject</Label>
-                    <Input
-                      id="ticketSubject"
-                      value={ticketSubject}
-                      onChange={(e) => setTicketSubject(e.target.value)}
-                      placeholder="What’s going on?"
-                    />
-                  </div>
+                    <div className="space-y-2">
+                      <Label htmlFor="ticketSubject">Subject</Label>
+                      <Input
+                        id="ticketSubject"
+                        value={ticketSubject}
+                        onChange={(e) => setTicketSubject(e.target.value)}
+                        placeholder="What’s going on?"
+                      />
+                    </div>
 
-                  <div className="space-y-2">
-                    <Label htmlFor="ticketMessage">Message</Label>
-                    <Textarea
-                      id="ticketMessage"
-                      value={ticketMessage}
-                      onChange={(e) => setTicketMessage(e.target.value)}
-                      placeholder="Describe the concern in detail..."
-                    />
+                    <div className="space-y-2">
+                      <Label htmlFor="ticketMessage">Message</Label>
+                      <Textarea
+                        id="ticketMessage"
+                        value={ticketMessage}
+                        onChange={(e) => setTicketMessage(e.target.value)}
+                        placeholder="Describe the concern in detail..."
+                      />
+                    </div>
                   </div>
+                </ScrollArea>
 
-                  <Button
-                    className="w-full"
-                    onClick={() => void fileTicket()}
-                    disabled={ticketLoading}
-                  >
-                    {ticketLoading ? "Submitting..." : "Submit Ticket"}
-                  </Button>
-                </div>
+                <Button
+                  className="w-full mt-3"
+                  onClick={() => void fileTicket()}
+                  disabled={ticketLoading}
+                >
+                  {ticketLoading ? "Submitting..." : "Submit Ticket"}
+                </Button>
               </TabsContent>
             </Tabs>
           </div>
