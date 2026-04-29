@@ -16,8 +16,7 @@ interface UserProfile {
   full_name: string;
   avatar_url?: string;
   role: "student" | "tutor" | "admin" | "organization";
-  organization_name?: string;
-  bio?: string;
+  organizations?: { name: string } | null;
   created_at?: string;
   tutor_profiles?: {
     hourly_rate?: number;
@@ -26,7 +25,12 @@ interface UserProfile {
     experience?: string;
     education?: string;
   }[];
-  ratings?: { stars: number; comment: string; student?: { full_name: string } }[];
+  ratings?: { 
+    id: string;
+    stars: number; 
+    comment: string; 
+    student?: { full_name: string } 
+  }[];
 }
 
 export function ProfileView() {
@@ -60,17 +64,18 @@ export function ProfileView() {
           full_name,
           avatar_url,
           role,
-          organization_name,
-          bio,
           created_at,
-          tutor_profiles:tutor_profiles!tutor_profiles_user_id_fkey (
+          organizations (
+            name
+          ),
+          tutor_profiles (
             hourly_rate,
             subjects,
             bio,
             experience,
             education
           ),
-          ratings:ratings!ratings_rated_user_profile_fkey (
+          ratings!ratings_rated_user_profile_fkey (
             id,
             stars,
             comment,
@@ -90,7 +95,12 @@ export function ProfileView() {
         return;
       }
 
-      setProfile(data);
+      // Format data for the UI
+      const formattedProfile: UserProfile = {
+        ...data,
+        ratings: (data.ratings as any[]) || []
+      };
+      setProfile(formattedProfile);
     } catch (error) {
       console.error("Error fetching profile:", error);
       toast.error("Failed to load profile");
@@ -255,15 +265,17 @@ export function ProfileView() {
                   <Badge variant="outline" className="text-sm">
                     {profile.role.charAt(0).toUpperCase() + profile.role.slice(1)}
                   </Badge>
-                  {profile.organization_name && (
+                  {profile.organizations?.name && (
                     <Badge variant="secondary" className="text-sm">
-                      {profile.organization_name}
+                      {profile.organizations.name}
                     </Badge>
                   )}
                 </div>
 
-                {profile.bio && (
-                  <p className="text-gray-600 mb-4 max-w-2xl">{profile.bio}</p>
+                {(profile.bio || profile.tutor_profiles?.[0]?.bio) && (
+                  <p className="text-gray-600 mb-4 max-w-2xl">
+                    {profile.bio || profile.tutor_profiles?.[0]?.bio}
+                  </p>
                 )}
 
                 {/* Stats */}

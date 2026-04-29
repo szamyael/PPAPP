@@ -17,7 +17,7 @@ interface User {
   full_name: string;
   avatar_url?: string;
   role: "student" | "tutor" | "admin" | "organization";
-  organization_name?: string;
+  organizations?: { name: string } | null;
   bio?: string;
   tutor_profiles?: {
     hourly_rate?: number;
@@ -54,9 +54,10 @@ export function FindPeople() {
           full_name,
           avatar_url,
           role,
-          organization_name,
-          bio,
-          tutor_profiles:tutor_profiles!tutor_profiles_user_id_fkey (
+          organizations (
+            name
+          ),
+          tutor_profiles (
             hourly_rate,
             subjects,
             bio
@@ -74,8 +75,8 @@ export function FindPeople() {
         full_name: u.full_name,
         avatar_url: u.avatar_url,
         role: u.role,
-        organization_name: u.organization_name,
-        bio: u.bio,
+        organizations: u.organizations,
+        bio: u.bio || u.tutor_profiles?.[0]?.bio,
         tutor_profiles: u.tutor_profiles,
         ratings_avg:
           u.ratings_received?.length > 0
@@ -174,7 +175,7 @@ export function FindPeople() {
       result = result.filter(
         (u) =>
           u.full_name.toLowerCase().includes(query) ||
-          u.organization_name?.toLowerCase().includes(query) ||
+          u.organizations?.name?.toLowerCase().includes(query) ||
           u.tutor_profiles?.[0]?.subjects?.some((s: string) => s.toLowerCase().includes(query))
       );
     }
@@ -268,8 +269,8 @@ export function FindPeople() {
                 name={u.full_name}
                 avatarUrl={u.avatar_url}
                 role={u.role}
-                bio={u.bio || u.tutor_profiles?.[0]?.bio}
-                organization={u.organization_name}
+                bio={u.bio}
+                organization={u.organizations?.name}
                 subjects={u.tutor_profiles?.[0]?.subjects}
                 hourlyRate={u.tutor_profiles?.[0]?.hourly_rate}
                 rating={u.ratings_avg}
