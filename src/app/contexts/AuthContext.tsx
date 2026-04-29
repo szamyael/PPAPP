@@ -142,22 +142,35 @@ export const AuthProvider: React.FC<{ children: React.ReactNode }> = ({
     }, 10000); // 10s safety net for UI
 
     const init = async () => {
+      const start = Date.now();
+      console.log("[Auth] Starting initialization...");
       try {
         // Try to restore session
-        const { data: { session: existingSession } } = await supabase.auth.getSession();
+        const { data: { session: existingSession }, error: sessionError } = await supabase.auth.getSession();
+        
+        if (sessionError) {
+          console.error("[Auth] Session fetch error:", sessionError);
+        }
+
+        console.log(`[Auth] Session fetch completed in ${Date.now() - start}ms. Session exists: ${!!existingSession}`);
 
         if (existingSession && mounted) {
           setSession(existingSession);
           try {
+            console.log("[Auth] Loading profile...");
+            const profileStart = Date.now();
             const appUser = await loadProfile(existingSession);
+            console.log(`[Auth] Profile load completed in ${Date.now() - profileStart}ms`);
             if (mounted) setUser(appUser);
           } catch (profileError) {
-            console.error("Profile load error during init:", profileError);
+            console.error("[Auth] Profile load error during init:", profileError);
           }
         }
       } catch (error) {
-        console.error("Auth initialization error:", error);
+        console.error("[Auth] Initialization fatal error:", error);
       } finally {
+        const totalTime = Date.now() - start;
+        console.log(`[Auth] Initialization finished in ${totalTime}ms`);
         clearTimeout(timeoutId);
         if (mounted) setLoading(false);
       }
