@@ -591,8 +591,7 @@ export function RegisterWizard() {
   if (step === 4 && accountType !== "organization") {
     const canSubmit = email.trim() !== "" && 
                       password.length >= 8 && 
-                      password === confirmPassword &&
-                      (!codeSent || verificationCode.trim().length === 6);
+                      password === confirmPassword;
 
     return (
       <div className="min-h-screen bg-gradient-to-br from-blue-50 to-purple-50 flex items-center justify-center p-4">
