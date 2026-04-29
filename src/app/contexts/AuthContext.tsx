@@ -136,16 +136,17 @@ export const AuthProvider: React.FC<{ children: React.ReactNode }> = ({
     // Timeout to prevent indefinite loading state
     const timeoutId = setTimeout(() => {
       if (mounted) {
-        console.warn("Auth initialization taking longer than expected...");
+        console.warn("[Auth] Initialization taking longer than expected (20s). Forcefully ending loading state.");
         setLoading(false);
       }
-    }, 10000); // 10s safety net for UI
+    }, 20000); // 20s safety net for slower networks
 
     const init = async () => {
       const start = Date.now();
       console.log("[Auth] Starting initialization...");
       try {
         // Try to restore session
+        console.log("[Auth] Fetching session...");
         const { data: { session: existingSession }, error: sessionError } = await supabase.auth.getSession();
         
         if (sessionError) {
@@ -157,7 +158,7 @@ export const AuthProvider: React.FC<{ children: React.ReactNode }> = ({
         if (existingSession && mounted) {
           setSession(existingSession);
           try {
-            console.log("[Auth] Loading profile...");
+            console.log("[Auth] Loading profile for session user:", existingSession.user.id);
             const profileStart = Date.now();
             const appUser = await loadProfile(existingSession);
             console.log(`[Auth] Profile load completed in ${Date.now() - profileStart}ms`);
@@ -180,7 +181,8 @@ export const AuthProvider: React.FC<{ children: React.ReactNode }> = ({
 
     // Listen for auth state changes (sign-in, sign-out, token refresh)
     const { data: { subscription } } = supabase.auth.onAuthStateChange(
-      async (_event, newSession) => {
+      async (event, newSession) => {
+        console.log(`[Auth] Auth state change event: ${event}`, { sessionExists: !!newSession });
         if (!mounted) return;
         try {
           setSession(newSession);
