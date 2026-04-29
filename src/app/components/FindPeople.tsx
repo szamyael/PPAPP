@@ -56,12 +56,12 @@ export function FindPeople() {
           role,
           organization_name,
           bio,
-          tutor_profiles:tutor_profiles!inner (
+          tutor_profiles:tutor_profiles (
             hourly_rate,
             subjects,
             bio
           ),
-          ratings_received:ratings (
+          ratings_received:ratings!rated_user (
             stars
           )
         `)

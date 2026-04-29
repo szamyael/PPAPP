@@ -63,18 +63,18 @@ export function ProfileView() {
           organization_name,
           bio,
           created_at,
-          tutor_profiles:tutor_profiles!inner (
+          tutor_profiles (
             hourly_rate,
             subjects,
             bio,
             experience,
             education
           ),
-          ratings_received:ratings (
+          ratings:ratings!rated_user (
             id,
             stars,
             comment,
-            student:profiles!ratings_rated_by_profile_fkey (
+            student:profiles!rated_by (
               full_name
             )
           )
