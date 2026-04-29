@@ -5,7 +5,7 @@ import { Navigation } from "./Navigation";
 import { Button } from "./ui/button";
 import { Card, CardContent, CardDescription, CardHeader, CardTitle } from "./ui/card";
 import { Badge } from "./ui/badge";
-import { Users, Building2, GraduationCap, DollarSign, CheckCircle, XCircle, Loader2, Bell } from "lucide-react";
+import { Users, Building2, GraduationCap, DollarSign, CheckCircle, XCircle, Loader2, Bell, Search } from "lucide-react";
 import { toast } from "sonner";
 import { supabase } from "../lib/supabaseClient";
 
