@@ -16,6 +16,16 @@ interface PendingStudent {
   program: string | null;
   student_id: string | null;
   year_level: string | null;
+  department: string | null;
+}
+
+interface ManagedUser {
+  id: string;
+  full_name: string;
+  email: string;
+  role: string;
+  approval_status: string;
+  created_at: string;
 }
 
 interface OrgRequest {
@@ -42,6 +52,11 @@ export function AdminDashboard() {
   const [orgRequests, setOrgRequests]         = useState<OrgRequest[]>([]);
   const [stats, setStats]                     = useState<Stats | null>(null);
   const [loading, setLoading]                 = useState(true);
+  
+  // User Management state
+  const [searchQuery, setSearchQuery] = useState("");
+  const [searchResults, setSearchResults] = useState<ManagedUser[]>([]);
+  const [searching, setSearching] = useState(false);
 
   useEffect(() => {
     if (!user || user.role !== "admin") navigate("/login");
@@ -53,7 +68,7 @@ export function AdminDashboard() {
     const [studentsRes, orgsRes, statsRes] = await Promise.all([
       supabase
         .from("profiles")
-        .select("id, full_name, email, program, student_id, year_level")
+        .select("id, full_name, email, program, student_id, year_level, department")
         .eq("role", "student")
         .eq("approval_status", "pending")
         .order("created_at", { ascending: true }),
@@ -140,6 +155,53 @@ export function AdminDashboard() {
     setOrgRequests((prev) => prev.filter((r) => r.id !== reqId));
   };
 
+  const handleSearchUsers = async (e?: React.FormEvent) => {
+    if (e) e.preventDefault();
+    if (!searchQuery.trim()) {
+      setSearchResults([]);
+      return;
+    }
+    setSearching(true);
+    const { data, error } = await supabase
+      .from("profiles")
+      .select("id, full_name, email, role, approval_status, created_at")
+      .or(`full_name.ilike.%${searchQuery}%,email.ilike.%${searchQuery}%`)
+      .limit(10);
+    
+    if (error) {
+      toast.error("Search failed: " + error.message);
+    } else {
+      setSearchResults((data as ManagedUser[]) ?? []);
+    }
+    setSearching(false);
+  };
+
+  const handleResetPassword = async (email: string) => {
+    const { error } = await supabase.auth.resetPasswordForEmail(email, {
+      redirectTo: `${window.location.origin}/reset-password`,
+    });
+    if (error) {
+      toast.error("Failed to send reset link: " + error.message);
+    } else {
+      toast.success("Password reset link sent to " + email);
+    }
+  };
+
+  const handleToggleBan = async (userId: string, currentStatus: string) => {
+    const newStatus = currentStatus === "rejected" ? "approved" : "rejected";
+    const { error } = await supabase
+      .from("profiles")
+      .update({ approval_status: newStatus })
+      .eq("id", userId);
+    
+    if (error) {
+      toast.error("Failed to update status: " + error.message);
+    } else {
+      toast.success(`User status updated to ${newStatus}`);
+      setSearchResults(prev => prev.map(u => u.id === userId ? { ...u, approval_status: newStatus } : u));
+    }
+  };
+
   if (!user) return null;
 
   return (
@@ -173,7 +235,7 @@ export function AdminDashboard() {
               <StatCard icon={<DollarSign className="h-8 w-8 text-orange-600" />} label="Pending Approvals" value={String((stats?.pendingStudents ?? 0) + (stats?.pendingTutors ?? 0))} />
             </div>
 
-            {/* Pending Student Approvals */}
+            {/* Pending Approvals Section */}
             <div className="grid md:grid-cols-2 gap-6 mb-8">
               <Card>
                 <CardHeader>
@@ -200,6 +262,7 @@ export function AdminDashboard() {
                           program={s.program ?? "—"}
                           studentId={s.student_id ?? "—"}
                           yearLevel={s.year_level ?? "—"}
+                          department={s.department ?? "—"}
                           onApprove={() => handleStudentAction(s.id, s.full_name, "approved")}
                           onReject={() => handleStudentAction(s.id, s.full_name, "rejected")}
                         />
@@ -241,6 +304,101 @@ export function AdminDashboard() {
                 </CardContent>
               </Card>
             </div>
+
+            {/* User Management Section */}
+            <Card className="mb-8">
+              <CardHeader>
+                <CardTitle className="flex items-center gap-2">
+                  <Users className="h-5 w-5 text-blue-600" />
+                  User Management & Actions
+                </CardTitle>
+                <CardDescription>Search all users to send reset links or manage account status</CardDescription>
+              </CardHeader>
+              <CardContent>
+                <form onSubmit={handleSearchUsers} className="flex gap-2 mb-6">
+                  <div className="relative flex-1">
+                    <Search className="absolute left-3 top-1/2 -translate-y-1/2 h-4 w-4 text-gray-400" />
+                    <input
+                      type="text"
+                      placeholder="Search by name or email..."
+                      className="w-full pl-10 pr-4 py-2 border border-gray-200 rounded-md focus:outline-none focus:ring-2 focus:ring-blue-500 text-sm"
+                      value={searchQuery}
+                      onChange={(e) => setSearchQuery(e.target.value)}
+                    />
+                  </div>
+                  <Button type="submit" disabled={searching}>
+                    {searching ? <Loader2 className="h-4 w-4 animate-spin" /> : "Search Users"}
+                  </Button>
+                </form>
+
+                {searchResults.length > 0 ? (
+                  <div className="overflow-x-auto">
+                    <table className="w-full text-sm text-left">
+                      <thead className="text-xs text-gray-700 uppercase bg-gray-50">
+                        <tr>
+                          <th className="px-4 py-3">User</th>
+                          <th className="px-4 py-3">Role / Status</th>
+                          <th className="px-4 py-3">Created At</th>
+                          <th className="px-4 py-3 text-right">Actions</th>
+                        </tr>
+                      </thead>
+                      <tbody className="divide-y divide-gray-100">
+                        {searchResults.map((u) => (
+                          <tr key={u.id} className="hover:bg-gray-50/50 transition-colors">
+                            <td className="px-4 py-4">
+                              <p className="font-medium text-gray-900">{u.full_name}</p>
+                              <p className="text-gray-500 text-xs">{u.email}</p>
+                            </td>
+                            <td className="px-4 py-4">
+                              <div className="flex flex-col gap-1">
+                                <Badge variant="outline" className="w-fit capitalize">
+                                  {u.role}
+                                </Badge>
+                                <Badge 
+                                  variant={u.approval_status === "approved" ? "default" : "destructive"} 
+                                  className={`w-fit text-[10px] py-0 px-1.5 ${u.approval_status === "approved" ? "bg-green-100 text-green-700 border-green-200" : ""}`}
+                                >
+                                  {u.approval_status}
+                                </Badge>
+                              </div>
+                            </td>
+                            <td className="px-4 py-4 text-gray-500 text-xs">
+                              {new Date(u.created_at).toLocaleDateString()}
+                            </td>
+                            <td className="px-4 py-4 text-right">
+                              <div className="flex justify-end gap-2">
+                                <Button 
+                                  size="sm" 
+                                  variant="outline" 
+                                  className="h-8 text-xs gap-1 border-blue-200 text-blue-700 hover:bg-blue-50"
+                                  onClick={() => handleResetPassword(u.email)}
+                                >
+                                  <Bell className="h-3 w-3" /> Reset Pwd
+                                </Button>
+                                <Button 
+                                  size="sm" 
+                                  variant={u.approval_status === "approved" ? "destructive" : "default"}
+                                  className="h-8 text-xs gap-1"
+                                  onClick={() => handleToggleBan(u.id, u.approval_status)}
+                                >
+                                  {u.approval_status === "approved" ? (
+                                    <><XCircle className="h-3 w-3" /> Ban</>
+                                  ) : (
+                                    <><CheckCircle className="h-3 w-3" /> Unban</>
+                                  )}
+                                </Button>
+                              </div>
+                            </td>
+                          </tr>
+                        ))}
+                      </tbody>
+                    </table>
+                  </div>
+                ) : searchQuery && !searching ? (
+                  <p className="text-center text-gray-500 py-8 text-sm italic">No users found matching "{searchQuery}"</p>
+                ) : null}
+              </CardContent>
+            </Card>
           </>
         )}
       </div>
@@ -265,21 +423,22 @@ function StatCard({ icon, label, value }: { icon: ReactNode; label: string; valu
 }
 
 function StudentApprovalItem({
-  name, email, program, studentId, yearLevel, onApprove, onReject,
+  name, email, program, studentId, yearLevel, department, onApprove, onReject,
 }: {
   name: string; email: string; program: string; studentId: string;
-  yearLevel: string; onApprove: () => void; onReject: () => void;
+  yearLevel: string; department: string; onApprove: () => void; onReject: () => void;
 }) {
   return (
-    <div className="border border-gray-200 rounded-lg p-4">
+    <div className="border border-gray-200 rounded-lg p-4 bg-white hover:border-blue-200 transition-colors shadow-sm">
       <div className="mb-3">
-        <p className="font-semibold text-lg">{name}</p>
-        <p className="text-sm text-gray-600">{email}</p>
+        <p className="font-semibold text-lg text-gray-900">{name}</p>
+        <p className="text-sm text-gray-600 font-medium">{email}</p>
       </div>
-      <div className="space-y-1 mb-4">
-        <p className="text-sm"><strong>Program:</strong> {program}</p>
-        <p className="text-sm"><strong>Student ID:</strong> {studentId}</p>
-        <p className="text-sm"><strong>Year Level:</strong> {yearLevel}</p>
+      <div className="grid grid-cols-2 gap-y-2 mb-4 bg-gray-50 p-3 rounded-md">
+        <p className="text-xs text-gray-500"><strong>Department:</strong> <span className="text-gray-700">{department}</span></p>
+        <p className="text-xs text-gray-500"><strong>Program:</strong> <span className="text-gray-700">{program}</span></p>
+        <p className="text-xs text-gray-500"><strong>Student ID:</strong> <span className="text-gray-700">{studentId}</span></p>
+        <p className="text-xs text-gray-500"><strong>Year Level:</strong> <span className="text-gray-700">{yearLevel}</span></p>
       </div>
       <div className="flex gap-2">
         <Button size="sm" onClick={onApprove} className="flex-1">
