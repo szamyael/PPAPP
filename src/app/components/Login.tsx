@@ -1,4 +1,4 @@
-import { useState } from "react";
+import { useState, useEffect } from "react";
 import { useNavigate, Link } from "react-router";
 import { useAuth } from "../contexts/AuthContext";
 import { Button } from "./ui/button";
@@ -19,25 +19,25 @@ export function Login() {
   const set = (field: string) => (e: React.ChangeEvent<HTMLInputElement>) =>
     setFormData((prev) => ({ ...prev, [field]: e.target.value }));
 
+  // Reactively watch for "Email not confirmed" error from AuthContext
+  useEffect(() => {
+    if (loginError?.toLowerCase().includes("confirm") || loginError?.toLowerCase().includes("verify")) {
+      setNeedsVerification(true);
+      toast.info("Your email is not verified yet. Please enter the verification code sent to your email.");
+    }
+  }, [loginError]);
+
   const handleSubmit = async (e: React.FormEvent) => {
     e.preventDefault();
     setSubmitting(true);
 
     const role = await login(formData.email, formData.password);
-    
+    setSubmitting(false);
+
     if (role) {
-      setSubmitting(false);
       navigate(`/dashboard/${role}`, { replace: true });
-    } else {
-      // Check if error is due to unconfirmed email
-      if (loginError?.toLowerCase().includes("confirm") || loginError?.toLowerCase().includes("verify")) {
-        setNeedsVerification(true);
-        toast.info("Your email is not verified yet. Please enter the verification code sent to your email.");
-      } else {
-        toast.error(loginError ?? "Invalid email or password.");
-      }
-      setSubmitting(false);
     }
+    // Else: loginError is set in context, and our useEffect above will handle it
   };
 
   const handleVerify = async (e: React.FormEvent) => {
@@ -112,14 +112,34 @@ export function Login() {
                   "Verify & Continue"
                 )}
               </Button>
-              <Button 
-                type="button" 
-                variant="ghost" 
-                className="w-full text-gray-500 text-xs"
-                onClick={() => setNeedsVerification(false)}
-              >
-                Back to Login
-              </Button>
+              <div className="flex flex-col gap-2">
+                <Button 
+                  type="button" 
+                  variant="ghost" 
+                  className="w-full text-blue-600 text-xs hover:bg-blue-50"
+                  onClick={async () => {
+                    setSubmitting(true);
+                    // Trigger a resend by calling signUp again with same details
+                    // In Supabase, signUp for an existing unverified user resends the confirmation
+                    await supabase.auth.resend({
+                      type: 'signup',
+                      email: formData.email,
+                    });
+                    setSubmitting(false);
+                    toast.success("Verification code resent! Please check your email.");
+                  }}
+                >
+                  Resend Verification Code
+                </Button>
+                <Button 
+                  type="button" 
+                  variant="ghost" 
+                  className="w-full text-gray-500 text-xs"
+                  onClick={() => setNeedsVerification(false)}
+                >
+                  Back to Login
+                </Button>
+              </div>
             </form>
           ) : (
             <form onSubmit={handleSubmit} className="space-y-4">
