@@ -131,81 +131,113 @@ export const AuthProvider: React.FC<{ children: React.ReactNode }> = ({
   // ── Initialise: restore session from storage ──────────────────────
   useEffect(() => {
     let mounted = true;
-    let initPromise: Promise<void> | null = null;
+    let initialLoadHandled = false;
 
     // Timeout to prevent indefinite loading state
-    const timeoutId = setTimeout(() => {
-      if (mounted) {
-        console.warn("[Auth] Initialization taking longer than expected (20s). Forcefully ending loading state.");
+    const safetyTimeoutId = setTimeout(() => {
+      if (mounted && !initialLoadHandled) {
+        console.warn("[Auth] Initialization safety timeout reached (20s). Forcefully ending loading state.");
         setLoading(false);
+        initialLoadHandled = true;
       }
-    }, 20000); // 20s safety net for slower networks
+    }, 20000); 
+
+    const handleInitialSession = async (s: Session | null) => {
+      if (!mounted || initialLoadHandled) return;
+      
+      const start = Date.now();
+      console.log(`[Auth] Handling initial session (exists: ${!!s})`);
+      
+      try {
+        setSession(s);
+        if (s) {
+          console.log("[Auth] Loading profile...");
+          // Race profile load with a 10s timeout
+          const appUser = await Promise.race([
+            loadProfile(s),
+            new Promise<null>((resolve) => 
+              setTimeout(() => {
+                console.warn("[Auth] Profile load timed out after 10s");
+                resolve(null);
+              }, 10000)
+            )
+          ]);
+          if (mounted) setUser(appUser);
+        }
+      } catch (err) {
+        console.error("[Auth] Error in handleInitialSession:", err);
+      } finally {
+        if (mounted && !initialLoadHandled) {
+          console.log(`[Auth] Initial load completed in ${Date.now() - start}ms`);
+          setLoading(false);
+          initialLoadHandled = true;
+          clearTimeout(safetyTimeoutId);
+        }
+      }
+    };
 
     const init = async () => {
-      const start = Date.now();
       console.log("[Auth] Starting initialization...");
       try {
-        // Try to restore session
-        console.log("[Auth] Fetching session...");
-        const { data: { session: existingSession }, error: sessionError } = await supabase.auth.getSession();
+        // Try to restore session with a 10s timeout
+        const { data: { session: existingSession }, error: sessionError } = await Promise.race([
+          supabase.auth.getSession(),
+          new Promise<{ data: { session: null }; error: Error }>((_, reject) => 
+            setTimeout(() => reject(new Error("getSession timed out after 10s")), 10000)
+          )
+        ]);
         
         if (sessionError) {
           console.error("[Auth] Session fetch error:", sessionError);
         }
 
-        console.log(`[Auth] Session fetch completed in ${Date.now() - start}ms. Session exists: ${!!existingSession}`);
-
-        if (existingSession && mounted) {
-          setSession(existingSession);
-          try {
-            console.log("[Auth] Loading profile for session user:", existingSession.user.id);
-            const profileStart = Date.now();
-            const appUser = await loadProfile(existingSession);
-            console.log(`[Auth] Profile load completed in ${Date.now() - profileStart}ms`);
-            if (mounted) setUser(appUser);
-          } catch (profileError) {
-            console.error("[Auth] Profile load error during init:", profileError);
-          }
-        }
+        await handleInitialSession(existingSession);
       } catch (error) {
         console.error("[Auth] Initialization fatal error:", error);
-      } finally {
-        const totalTime = Date.now() - start;
-        console.log(`[Auth] Initialization finished in ${totalTime}ms`);
-        clearTimeout(timeoutId);
-        if (mounted) setLoading(false);
+        if (mounted && !initialLoadHandled) {
+          setLoading(false);
+          initialLoadHandled = true;
+          clearTimeout(safetyTimeoutId);
+        }
       }
     };
 
-    initPromise = init();
-
-    // Listen for auth state changes (sign-in, sign-out, token refresh)
+    // Listen for auth state changes immediately
     const { data: { subscription } } = supabase.auth.onAuthStateChange(
       async (event, newSession) => {
-        console.log(`[Auth] Auth state change event: ${event}`, { sessionExists: !!newSession });
+        console.log(`[Auth] Auth state change: ${event}`);
+        
         if (!mounted) return;
-        try {
+
+        // If this is the initial event and we haven't handled init yet, 
+        // it might be faster than getSession()
+        const isInitialEvent = event === 'INITIAL_SESSION' || event === 'SIGNED_IN' || event === 'SIGNED_OUT';
+        if (!initialLoadHandled && isInitialEvent) {
+          console.log(`[Auth] State change (${event}) triggered initial load handling`);
+          handleInitialSession(newSession);
+        } else {
           setSession(newSession);
           if (newSession) {
             try {
               const appUser = await loadProfile(newSession);
-              setUser(appUser);
+              if (mounted) setUser(appUser);
             } catch (profileError) {
-              console.error('Auth state change profile error:', profileError);
-              // Still set session even if profile fails
+              console.error('[Auth] State change profile load error:', profileError);
             }
           } else {
             setUser(null);
           }
-        } catch (error) {
-          console.error('Auth state change error:', error);
         }
       }
     );
 
+    // Run getSession after setting up the listener
+    init();
+
     return () => {
       mounted = false;
       subscription.unsubscribe();
+      clearTimeout(safetyTimeoutId);
     };
   }, []);
 
