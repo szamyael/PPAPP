@@ -5,7 +5,8 @@ import { Button } from "./ui/button";
 import { Input } from "./ui/input";
 import { Label } from "./ui/label";
 import { Card, CardContent, CardDescription, CardHeader, CardTitle } from "./ui/card";
-import { GraduationCap, AlertCircle, Loader2 } from "lucide-react";
+import { GraduationCap, AlertCircle, Loader2, Mail } from "lucide-react";
+import { supabase } from "../lib/supabaseClient";
 import { toast } from "sonner";
 
 export function Login() {
